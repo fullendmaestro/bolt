@@ -1,20 +1,50 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
 function App(): React.JSX.Element {
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [processing, setProcessing] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    window.qvacAPI.loadModel().then(() => setLoading(false))
+
+    window.qvacAPI.onCompletionStream((token) => {
+      if (token === '') {
+        setProcessing(false)
+      } else {
+        setMessages(prev => {
+          const updated = [...prev]
+          updated[updated.length - 1].content += token
+          return updated
+        })
+      }
+    })
+
+    return () => { window.qvacAPI.unloadModel() }
+  }, [])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const handleSend = (): void => {
-    if (!input.trim()) return
-    setMessages(prev => [
-      ...prev,
-      { role: 'user', content: input },
-      { role: 'assistant', content: 'Stub response from the assistant.' }
+    if (!input.trim() || processing || loading) return
+
+    const nextHistory: Message[] = [
+      ...messages,
+      { role: 'user', content: input }
+    ]
+    setMessages([...nextHistory, { role: 'assistant', content: '' }])
+    window.qvacAPI.infer([
+      { role: 'system', content: 'You are a helpful assistant.' },
+      ...nextHistory
     ])
     setInput('')
+    setProcessing(true)
   }
 
   return (
@@ -60,6 +90,7 @@ function App(): React.JSX.Element {
             </div>
           ))
         )}
+        <div ref={bottomRef} />
       </main>
 
       {/* Input */}
@@ -80,7 +111,8 @@ function App(): React.JSX.Element {
           />
           <button
             onClick={handleSend}
-            className="self-end rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+            disabled={processing || loading}
+            className="self-end rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Send
           </button>

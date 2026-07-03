@@ -23,6 +23,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@qvac/sdk": "^0.14.1",
     "@tailwindcss/vite": "^4.3.2",
     "tailwindcss": "^4.3.2"
   },
