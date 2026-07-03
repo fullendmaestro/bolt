@@ -1,4 +1,0 @@
-allowBuilds:
-  electron: true
-  fs-xattr: true
-  macos-alias: true
