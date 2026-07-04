@@ -3,5 +3,6 @@
     "features": {
         "ghcr.io/devcontainers/features/desktop-lite:1": {}
     },
+    "forwardPorts": [6080],
     "postCreateCommand": "npm install -g pnpm && sudo apt-get update && sudo apt-get install -y libnss3 libxss1 libasound2 libatk-bridge2.0-0 libgtk-3-0 libgbm1 || sudo apt-get install -y libnss3 libxss1 libasound2t64 libatk-bridge2.0-0t64 libgtk-3-0t64 libgbm1"
 }
