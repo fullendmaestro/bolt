@@ -20,6 +20,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.2
         version: 4.3.2(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(lightningcss@1.32.0))
+      bare-runtime-win32-x64:
+        specifier: ^1.30.3
+        version: 1.30.3(bare-url@2.4.5)
       tailwindcss:
         specifier: ^4.3.2
         version: 4.3.2
@@ -1519,6 +1522,12 @@ packages:
 
   bare-runtime-win32-x64@1.30.2:
     resolution: {integrity: sha512-D6Bn+oeHoT+MmVOAFUVOJBpSUu+tq9DITHS7LZomM5dQD5915WbgS/bk38dM/z6d6SD0b9viXx8Zbx+8m8L27A==}
+    cpu: [x64]
+    os: [win32]
+    hasBin: true
+
+  bare-runtime-win32-x64@1.30.3:
+    resolution: {integrity: sha512-4ujzW6cAyZL1ED/TFiaBkFrfA/rmLvntN++HwG+wb2gjQfYF/5q0+2y5f4hy2DcFcFB3oTySbeERiBOXXXbp9Q==}
     cpu: [x64]
     os: [win32]
     hasBin: true
@@ -5260,6 +5269,12 @@ snapshots:
       - bare-url
     optional: true
 
+  bare-runtime-win32-x64@1.30.3(bare-url@2.4.5):
+    dependencies:
+      require-asset: 1.2.2(bare-url@2.4.5)
+    transitivePeerDependencies:
+      - bare-url
+
   bare-runtime@1.30.2(bare-abort-controller@1.1.2)(bare-buffer@3.6.1)(bare-url@2.4.5):
     dependencies:
       bare-fs: 4.7.3(bare-abort-controller@1.1.2)(bare-buffer@3.6.1)
@@ -7437,7 +7452,6 @@ snapshots:
       bare-module-resolve: 1.12.2(bare-url@2.4.5)
     transitivePeerDependencies:
       - bare-url
-    optional: true
 
   require-directory@2.1.1: {}
 
