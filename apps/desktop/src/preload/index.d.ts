@@ -1,3 +1,5 @@
+import type { ChannelEvent } from '../shared/types'
+
 declare global {
   interface Window {
     electron: {
@@ -6,14 +8,43 @@ declare global {
       }
     }
     qvacAPI: {
+      // AI APIs
       loadModel: () => Promise<string>
       infer: (history: { role: string; content: string }[]) => Promise<void>
-      onCompletionStream: (cb: (token: string) => void) => void
       unloadModel: () => Promise<string>
-      sendP2PCommand: (payload: any) => Promise<void>
+      onCompletionStream: (cb: (token: string) => void) => void
+
+      // Channel Management
+      joinChannel: (channelKey: string) => Promise<void>
+      leaveChannel: (channelKey: string) => Promise<void>
+      getJoinedChannels: () => Promise<string[]>
+      initChannel: (name: string, description: string) => Promise<void>
+
+      // Feed
+      getFeed: () => Promise<void>
+
+      // Upload / Studio
+      selectAndUploadVideo: (title: string) => Promise<{ canceled: boolean; filePath?: string }>
+      getUploads: () => Promise<void>
+
+      // Streaming
+      getStreamUrl: (channelKey: string, videoId: string) => Promise<void>
+
+      // Live Events (AI Context)
+      onChannelEvent: (cb: (event: ChannelEvent) => void) => void
+      removeChannelEventListener: () => void
+
+      // Worker Messages (generic)
       onP2PMessage: (cb: (msg: any) => void) => void
+      removeP2PMessageListener: () => void
+
+      // Event Injection
+      injectEvent: (event: Omit<ChannelEvent, 'channelKey'>) => Promise<void>
+
+      // Legacy
+      sendP2PCommand: (payload: any) => Promise<void>
     }
   }
 }
 
-export { }
+export {}

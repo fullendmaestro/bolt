@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import os from 'os'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,16 +8,33 @@ import {
   unloadModel,
   completion
 } from '@qvac/sdk'
+import Store from 'electron-store'
+import type { P2PCommand, P2PResponse, ChannelEvent } from '../shared/types'
 
 const PearRuntime = require('pear-runtime')
 const FramedStream = require('framed-stream')
 
 app.commandLine.appendSwitch('no-sandbox')
 
+// ── State ──────────────────────────────────────────────────
 let win: BrowserWindow | null = null
 let modelId: string | null = null
 let workerPipe: any = null
 
+// ── Local Persistence ──────────────────────────────────────
+interface StoreSchema {
+  joinedChannels: string[]
+  ownChannelKey: string | null
+}
+
+const localStore = new Store<StoreSchema>({
+  defaults: {
+    joinedChannels: [],
+    ownChannelKey: null
+  }
+})
+
+// ── Window Creation ────────────────────────────────────────
 function createWindow(): void {
   win = new BrowserWindow({
     width: 900,
@@ -39,7 +56,46 @@ function createWindow(): void {
   }
 }
 
-function initP2PWorker() {
+// ── P2P Worker Management ──────────────────────────────────
+function sendToWorker(command: P2PCommand): void {
+  if (workerPipe) {
+    workerPipe.write(JSON.stringify(command))
+  } else {
+    console.warn('Worker pipe not initialized, cannot send:', command.type)
+  }
+}
+
+function handleWorkerMessage(message: P2PResponse): void {
+  if (!win || win.isDestroyed()) return
+
+  switch (message.type) {
+    case 'worker-ready':
+      console.log('P2P Worker is ready')
+      // Rejoin all saved channels
+      const savedChannels = localStore.get('joinedChannels', [])
+      for (const key of savedChannels) {
+        sendToWorker({ type: 'join-channel', channelKey: key })
+      }
+      // Restore own channel if it exists
+      const ownKey = localStore.get('ownChannelKey', null)
+      if (ownKey) {
+        sendToWorker({ type: 'join-channel', channelKey: ownKey })
+      }
+      break
+
+    case 'channel-event':
+      // Route channel events to the renderer for AI context injection
+      win.webContents.send('channel-event', message.event)
+      break
+
+    default:
+      // Forward all other messages to the renderer
+      win.webContents.send('p2p-worker-message', message)
+      break
+  }
+}
+
+function initP2PWorker(): void {
   const appName = 'BoltSports'
   const storageDir = join(os.homedir(), '.config', appName)
   const workerPath = join(__dirname, 'worker.js')
@@ -56,8 +112,12 @@ function initP2PWorker() {
   workerPipe = new FramedStream(worker)
 
   workerPipe.on('data', (data: Buffer) => {
-    const message = JSON.parse(data.toString())
-    win?.webContents.send('p2p-worker-message', message)
+    try {
+      const message = JSON.parse(data.toString())
+      handleWorkerMessage(message)
+    } catch (err) {
+      console.error('Failed to parse worker message:', err)
+    }
   })
 
   worker.stderr.on('data', (err: Buffer) => {
@@ -65,7 +125,9 @@ function initP2PWorker() {
   })
 }
 
+// ── IPC Handlers ───────────────────────────────────────────
 function setupHandlers(): void {
+  // ── QVAC AI Handlers ──────────────────────────────────
   ipcMain.handle('load-model', async () => {
     modelId = await loadModel({
       modelSrc: LLAMA_3_2_1B_INST_Q4_0,
@@ -92,6 +154,74 @@ function setupHandlers(): void {
     return 'model unloaded'
   })
 
+  // ── Channel Subscription Handlers ─────────────────────
+  ipcMain.handle('channel:join', async (_event, channelKey: string) => {
+    const channels = localStore.get('joinedChannels', [])
+    if (!channels.includes(channelKey)) {
+      channels.push(channelKey)
+      localStore.set('joinedChannels', channels)
+    }
+    sendToWorker({ type: 'join-channel', channelKey })
+  })
+
+  ipcMain.handle('channel:leave', async (_event, channelKey: string) => {
+    const channels = localStore.get('joinedChannels', [])
+    localStore.set(
+      'joinedChannels',
+      channels.filter((k) => k !== channelKey)
+    )
+    sendToWorker({ type: 'leave-channel', channelKey })
+  })
+
+  ipcMain.handle('channel:list', async () => {
+    return localStore.get('joinedChannels', [])
+  })
+
+  ipcMain.handle('channel:init', async (_event, name: string, description: string) => {
+    sendToWorker({ type: 'init-channel', name, description })
+  })
+
+  // ── Feed Handler ──────────────────────────────────────
+  ipcMain.handle('feed:get', async () => {
+    sendToWorker({ type: 'get-feed' })
+  })
+
+  // ── Upload Handlers ───────────────────────────────────
+  ipcMain.handle('video:select-and-upload', async (_event, title: string) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true }
+    }
+
+    const filePath = result.filePaths[0]
+    sendToWorker({
+      type: 'upload-video',
+      filePath,
+      title: title || 'Untitled Upload',
+      duration: '0:00'
+    })
+    return { canceled: false, filePath }
+  })
+
+  ipcMain.handle('uploads:get', async () => {
+    sendToWorker({ type: 'get-uploads' })
+  })
+
+  // ── Streaming Handler ─────────────────────────────────
+  ipcMain.handle('stream:start', async (_event, channelKey: string, videoId: string) => {
+    sendToWorker({ type: 'start-stream', channelKey, videoId })
+  })
+
+  // ── Event Injection Handler ───────────────────────────
+  ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'>) => {
+    sendToWorker({ type: 'inject-event', event: eventData })
+  })
+
+  // ── Legacy P2P Send (backward compatibility) ──────────
   ipcMain.handle('p2p-send', async (_event, payload) => {
     if (workerPipe) {
       workerPipe.write(JSON.stringify(payload))
@@ -101,6 +231,7 @@ function setupHandlers(): void {
   })
 }
 
+// ── App Lifecycle ──────────────────────────────────────────
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.bolt.sports')
   app.on('browser-window-created', (_, window) => {
