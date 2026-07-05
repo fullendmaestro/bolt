@@ -70,13 +70,14 @@ async function readDriveJSON(drive, filePath) {
     const buf = await drive.get(filePath)
     if (!buf) return null
     return JSON.parse(b4a.toString(buf))
-  } catch {
+  } catch (err) {
+    console.error('readDriveJSON error:', err)
     return null
   }
 }
 
 async function writeDriveJSON(drive, filePath, data) {
-  await drive.put(filePath, Buffer.from(JSON.stringify(data, null, 2)))
+  await drive.put(filePath, b4a.from(JSON.stringify(data, null, 2)))
 }
 
 // ── Swarm connection handler ───────────────────────────────

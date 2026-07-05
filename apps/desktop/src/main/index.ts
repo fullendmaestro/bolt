@@ -21,6 +21,15 @@ let win: BrowserWindow | null = null
 let modelId: string | null = null
 let workerPipe: any = null
 
+// Check for custom user-data-dir
+for (const arg of process.argv) {
+  if (arg.startsWith('--user-data-dir=')) {
+    const dir = arg.replace('--user-data-dir=', '')
+    app.setPath('userData', join(process.cwd(), dir))
+    break
+  }
+}
+
 // ── Local Persistence ──────────────────────────────────────
 interface StoreSchema {
   joinedChannels: string[]

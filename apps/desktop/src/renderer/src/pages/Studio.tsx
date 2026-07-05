@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   UploadCloud,
   BarChart,
@@ -7,10 +7,23 @@ import {
   Loader2,
   Copy,
   Check,
-  FileVideo
+  FileVideo,
 } from 'lucide-react'
 import type { ChannelMetadata, VideoEntry } from '../../../shared/types'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+// ── Studio Page ────────────────────────────────────────────
 export function Studio() {
   const [uploading, setUploading] = useState(false)
   const [uploadTitle, setUploadTitle] = useState('')
@@ -18,38 +31,49 @@ export function Studio() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [initializing, setInitializing] = useState(false)
+  
+  // Dialog state
+  const [showInitModal, setShowInitModal] = useState(false)
+  const [channelName, setChannelName] = useState('')
+  const [channelDesc, setChannelDesc] = useState('')
+  const [initError, setInitError] = useState<string | null>(null)
 
-  const loadUploads = useCallback(() => {
-    setLoading(true)
-
+  // Set up a persistent, global P2P message listener for the lifetime of this page
+  useEffect(() => {
     const handleMessage = (msg: any) => {
       if (msg.type === 'uploads-data') {
         setChannelData(msg.channel || null)
         setLoading(false)
       } else if (msg.type === 'upload-complete') {
-        // Append the new upload to the existing channel data
         setChannelData((prev) => {
           if (!prev) return prev
-          return {
-            ...prev,
-            videos: [msg.video, ...prev.videos]
-          }
+          return { ...prev, videos: [msg.video, ...prev.videos] }
         })
         setUploading(false)
         setUploadTitle('')
       } else if (msg.type === 'channel-initialized') {
-        // Refresh uploads after channel init
         setInitializing(false)
+        setShowInitModal(false)
+        setInitError(null)
+        // Refresh channel data now that init is done
         window.qvacAPI.getUploads()
-      } else if (msg.type === 'error' && msg.command === 'upload-video') {
-        console.error('Upload error:', msg.message)
-        setUploading(false)
+      } else if (msg.type === 'error') {
+        if (msg.command === 'upload-video') {
+          console.error('Upload error:', msg.message)
+          setUploading(false)
+        } else if (msg.command === 'init-channel') {
+          console.error('Channel init error:', msg.message)
+          setInitError(msg.message || 'Unknown error occurred')
+          setInitializing(false)
+        }
       }
     }
 
     window.qvacAPI.onP2PMessage(handleMessage)
-    window.qvacAPI.getUploads()
 
+    // Kick off initial data load
+    setLoading(true)
+    window.qvacAPI.getUploads()
     const timeout = setTimeout(() => setLoading(false), 5000)
 
     return () => {
@@ -58,17 +82,18 @@ export function Studio() {
     }
   }, [])
 
-  useEffect(() => {
-    const cleanup = loadUploads()
-    return cleanup
-  }, [loadUploads])
+  const handleInitSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!channelName.trim()) return
 
-  const handleInitChannel = async () => {
     setInitializing(true)
+    setInitError(null)
     try {
-      await window.qvacAPI.initChannel('My Bolt Node', 'Personal sports channel')
-    } catch (err) {
+      await window.qvacAPI.initChannel(channelName.trim(), channelDesc.trim())
+      // `channel-initialized` worker message will finalize state and close modal
+    } catch (err: any) {
       console.error('Failed to init channel:', err)
+      setInitError(err.message || 'Failed to initialize channel')
       setInitializing(false)
     }
   }
@@ -99,6 +124,73 @@ export function Studio() {
 
   return (
     <div className="max-w-[1400px] mx-auto p-6 md:p-8 flex flex-col gap-8">
+      {/* Shadcn Channel Init Dialog */}
+      <Dialog open={showInitModal} onOpenChange={setShowInitModal}>
+        <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-neutral-800 text-white">
+          <form onSubmit={handleInitSubmit}>
+            <DialogHeader>
+              <DialogTitle>Create Your Channel</DialogTitle>
+              <DialogDescription className="text-neutral-400">
+                This will generate a unique cryptographic keypair on the Holepunch network. Your
+                channel key will be displayed after creation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              {initError && (
+                <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-lg text-sm mb-2">
+                  {initError}
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="name" className="text-xs font-semibold text-neutral-400 uppercase">
+                  Channel Name <span className="text-red-400">*</span>
+                </label>
+                <Input
+                  id="name"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                  placeholder="e.g. My Sports Node"
+                  className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500"
+                  maxLength={64}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="desc" className="text-xs font-semibold text-neutral-400 uppercase">
+                  Description
+                </label>
+                <Textarea
+                  id="desc"
+                  value={channelDesc}
+                  onChange={(e) => setChannelDesc(e.target.value)}
+                  placeholder="What's this channel about?"
+                  className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 resize-none"
+                  rows={3}
+                  maxLength={256}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowInitModal(false)}
+                className="hover:bg-neutral-800 hover:text-white text-neutral-300"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!channelName.trim() || initializing}
+                className="bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
+              >
+                {initializing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {initializing ? 'Creating...' : 'Create Channel'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Studio Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -108,14 +200,14 @@ export function Studio() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors text-sm font-medium">
-            <BarChart className="h-4 w-4" />
+          <Button variant="secondary" className="bg-neutral-800 hover:bg-neutral-700 text-white border-none">
+            <BarChart className="mr-2 h-4 w-4" />
             Node Analytics
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors text-sm font-medium">
-            <Settings className="h-4 w-4" />
+          </Button>
+          <Button variant="secondary" className="bg-neutral-800 hover:bg-neutral-700 text-white border-none">
+            <Settings className="mr-2 h-4 w-4" />
             Settings
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -126,29 +218,28 @@ export function Studio() {
             <p className="text-xs text-neutral-500 mb-1 uppercase tracking-wider font-semibold">
               Your Channel Public Key
             </p>
-            <p className="text-sm text-indigo-400 font-mono truncate">
-              {channelData.publicKey}
-            </p>
+            <p className="text-sm text-indigo-400 font-mono truncate">{channelData.publicKey}</p>
             <p className="text-xs text-neutral-500 mt-1">
               Share this key with others so they can subscribe to your channel.
             </p>
           </div>
-          <button
+          <Button
+            variant="secondary"
             onClick={handleCopyKey}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors text-sm font-medium shrink-0"
+            className="bg-neutral-800 hover:bg-neutral-700 text-white border-none shrink-0"
           >
             {copied ? (
               <>
-                <Check className="h-4 w-4 text-emerald-400" />
+                <Check className="mr-2 h-4 w-4 text-emerald-400" />
                 Copied
               </>
             ) : (
               <>
-                <Copy className="h-4 w-4" />
+                <Copy className="mr-2 h-4 w-4" />
                 Copy
               </>
             )}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -163,14 +254,14 @@ export function Studio() {
             Create your persistent P2P channel. This generates a unique cryptographic keypair that
             represents your channel on the Holepunch network.
           </p>
-          <button
-            onClick={handleInitChannel}
+          <Button
+            onClick={() => setShowInitModal(true)}
             disabled={initializing}
-            className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-neutral-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="bg-white text-black hover:bg-neutral-200 rounded-full px-6 py-5 text-sm font-semibold"
           >
-            {initializing && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create Channel
-          </button>
+            {initializing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {initializing ? 'Creating Channel...' : 'Create Channel'}
+          </Button>
         </div>
       )}
 
@@ -187,29 +278,28 @@ export function Studio() {
           </p>
 
           <div className="flex items-center gap-3 mb-4 w-full max-w-sm">
-            <input
-              type="text"
+            <Input
               value={uploadTitle}
               onChange={(e) => setUploadTitle(e.target.value)}
               placeholder="Video title..."
-              className="flex-1 px-4 py-2.5 bg-[#0F0F0F] border border-neutral-700 rounded-xl text-sm text-white placeholder:text-neutral-500 outline-none focus:border-indigo-500/50"
+              className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 rounded-xl"
             />
           </div>
 
-          <button
+          <Button
             onClick={handleSelectAndUpload}
             disabled={uploading}
-            className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-neutral-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="bg-white text-black hover:bg-neutral-200 rounded-full px-6 py-5 text-sm font-semibold"
           >
             {uploading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Uploading...
               </>
             ) : (
               'Select Files to Seed'
             )}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -274,9 +364,9 @@ export function Studio() {
                     <span className="text-sm text-neutral-400">
                       {new Date(video.timestamp).toLocaleDateString()}
                     </span>
-                    <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-neutral-800 rounded-md">
-                      <MoreVertical className="h-4 w-4 text-neutral-400" />
-                    </button>
+                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-neutral-800 hover:text-white text-neutral-400">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
