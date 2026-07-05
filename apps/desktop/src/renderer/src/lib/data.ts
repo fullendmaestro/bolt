@@ -70,3 +70,33 @@ export const MOCK_STREAMS: Stream[] = [
       'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&auto=format&fit=crop'
   }
 ]
+
+// --- NEW: User's Channel Data ---
+export const USER_UPLOADS: Stream[] = [
+  {
+    id: 'u1',
+    title: 'My Local Node Test Stream | 1080p60',
+    channel: 'My Bolt Node',
+    viewers: '142',
+    isLive: false,
+    time: '1 day ago',
+    duration: '1:12:05',
+    thumbnail:
+      'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?q=80&w=1200&auto=format&fit=crop',
+    avatar:
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop'
+  },
+  {
+    id: 'u2',
+    title: 'Sunday League Highlights - Week 4',
+    channel: 'My Bolt Node',
+    viewers: '85',
+    isLive: false,
+    time: '3 days ago',
+    duration: '14:20',
+    thumbnail:
+      'https://images.unsplash.com/photo-1518605368461-1e1e38ce7058?q=80&w=1200&auto=format&fit=crop',
+    avatar:
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop'
+  }
+]

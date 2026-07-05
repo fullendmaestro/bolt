@@ -4,6 +4,7 @@ import { Header } from './components/Header'
 import { Sidebar } from './components/Sidebar'
 import { Home } from './pages/Home'
 import { Watch } from './pages/Watch'
+import { Studio } from './pages/Studio' // NEW IMPORT
 
 function AppLayout() {
   const [modelLoading, setModelLoading] = useState(true)
@@ -11,9 +12,11 @@ function AppLayout() {
 
   const location = useLocation()
 
-  // Auto-collapse sidebar when on the watch page for maximum cinematic space
+  // Auto-collapse sidebar when on the watch page or studio for maximum workspace
   useEffect(() => {
-    setIsSidebarExpanded(!location.pathname.startsWith('/watch'))
+    const isWatchOrStudio =
+      location.pathname.startsWith('/watch') || location.pathname.startsWith('/studio')
+    setIsSidebarExpanded(!isWatchOrStudio)
   }, [location.pathname])
 
   // Initialize the local QVAC AI core globally
@@ -43,7 +46,7 @@ function AppLayout() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/watch/:id" element={<Watch modelLoading={modelLoading} />} />
-            {/* Future routes like /channel/:id can go here */}
+            <Route path="/studio" element={<Studio />} /> {/* NEW ROUTE */}
           </Routes>
         </main>
       </div>
