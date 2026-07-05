@@ -105,11 +105,15 @@ function initP2PWorker(): void {
     app.getAppPath(),
     'false',
     app.getVersion(),
-    'bolt://prod',
+    'pear://0000000000000000000000000000000000000000000000000000000000000000',
     appName
   ])
 
   workerPipe = new FramedStream(worker)
+
+  workerPipe.on('error', (err) => {
+    console.error('Worker pipe error:', err)
+  })
 
   workerPipe.on('data', (data: Buffer) => {
     try {

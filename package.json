@@ -28,5 +28,8 @@
       "bare-runtime-android-arm64",
       "bare-runtime-ios-arm64"
     ]
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }
