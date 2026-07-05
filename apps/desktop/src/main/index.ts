@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import os from 'os'
+
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   LLAMA_3_2_1B_INST_Q4_0,
@@ -97,7 +97,7 @@ function handleWorkerMessage(message: P2PResponse): void {
 
 function initP2PWorker(): void {
   const appName = 'BoltSports'
-  const storageDir = join(os.homedir(), '.config', appName)
+  const storageDir = app.getPath('userData')
   const workerPath = join(__dirname, 'worker.js')
 
   const worker = PearRuntime.run(workerPath, [

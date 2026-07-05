@@ -50,7 +50,7 @@ let ownChannelKey = null
 /** @type {import('bare-http1').Server|null} */
 let streamServer = null
 
-const STREAM_PORT = 4000
+let STREAM_PORT = 0
 
 // ── Helpers ────────────────────────────────────────────────
 function send(msg) {
@@ -355,15 +355,21 @@ function startStreamServer() {
     }
   })
 
-  streamServer.listen(STREAM_PORT, '127.0.0.1', () => {
+  streamServer.listen(0, '127.0.0.1', () => {
+    STREAM_PORT = streamServer.address().port
     console.log('Bolt stream server listening on http://127.0.0.1:' + STREAM_PORT)
   })
 }
 
 async function startStream(channelKey, videoId) {
   try {
-    // Ensure the streaming server is running
-    startStreamServer()
+    // Ensure the streaming server is running and wait for it to bind
+    if (!streamServer) {
+      await new Promise((resolve) => {
+        startStreamServer()
+        streamServer.once('listening', resolve)
+      })
+    }
 
     const url = 'http://127.0.0.1:' + STREAM_PORT + '/stream/' + channelKey + '/' + videoId
     send({ type: 'stream-url', url, channelKey, videoId })

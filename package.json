@@ -1,0 +1,32 @@
+{
+  "name": "bolt-monorepo",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm -F desktop dev",
+    "build": "pnpm -F desktop build",
+    "preview": "pnpm -F desktop build && concurrently \"pnpm -F desktop start -- --user-data-dir=./.data/seeder\" \"pnpm -F desktop start -- --user-data-dir=./.data/peer1\" \"pnpm -F desktop start -- --user-data-dir=./.data/peer2\"",
+    "clean:data": "rm -rf apps/desktop/.data"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
+      "esbuild",
+      "@qvac/embed-llamacpp",
+      "@qvac/ocr-ggml",
+      "@qvac/diffusion-cpp",
+      "@qvac/transcription-parakeet",
+      "@qvac/translation-nmtcpp",
+      "bare-runtime-linux-x64",
+      "bare-runtime-darwin-arm64",
+      "bare-runtime-darwin-x64",
+      "bare-runtime-win32-x64",
+      "bare-runtime-android-arm64",
+      "bare-runtime-ios-arm64"
+    ]
+  }
+}
