@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { ThumbsUp, ThumbsDown, Share2, MoreHorizontal, PlayCircle, Loader2, Wifi } from 'lucide-react'
 import { MOCK_STREAMS } from '../lib/data'
 import { ChatInterface } from '../components/ChatInterface'
@@ -32,6 +33,7 @@ export function Watch({ modelLoading }: { modelLoading: boolean }) {
         setConnectionState('buffering')
       } else if (msg.type === 'error' && msg.command === 'start-stream') {
         setConnectionState('error')
+        toast.error(`Failed to load stream: ${msg.message}`)
       }
     }
 
@@ -48,8 +50,10 @@ export function Watch({ modelLoading }: { modelLoading: boolean }) {
     try {
       await window.qvacAPI.joinChannel(channelKey)
       setJoined(true)
-    } catch (err) {
+      toast.success('Successfully joined the channel!')
+    } catch (err: any) {
       console.error('Failed to join channel:', err)
+      toast.error(`Failed to join channel: ${err.message || 'Unknown error'}`)
     }
   }
 

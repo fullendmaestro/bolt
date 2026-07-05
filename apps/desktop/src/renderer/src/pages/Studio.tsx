@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import {
   UploadCloud,
   BarChart,
@@ -51,19 +52,23 @@ export function Studio() {
         })
         setUploading(false)
         setUploadTitle('')
+        toast.success('Video uploaded successfully!')
       } else if (msg.type === 'channel-initialized') {
         setInitializing(false)
         setShowInitModal(false)
         setInitError(null)
+        toast.success('Channel created successfully!')
         // Refresh channel data now that init is done
         window.qvacAPI.getUploads()
       } else if (msg.type === 'error') {
         if (msg.command === 'upload-video') {
           console.error('Upload error:', msg.message)
+          toast.error(`Upload failed: ${msg.message}`)
           setUploading(false)
         } else if (msg.command === 'init-channel') {
           console.error('Channel init error:', msg.message)
           setInitError(msg.message || 'Unknown error occurred')
+          toast.error(`Channel initialization failed: ${msg.message}`)
           setInitializing(false)
         }
       }

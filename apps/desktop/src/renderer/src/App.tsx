@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { Header } from './components/Header'
 import { Sidebar } from './components/Sidebar'
 import { Home } from './pages/Home'
@@ -50,6 +51,7 @@ function AppLayout() {
           </Routes>
         </main>
       </div>
+      <Toaster theme="dark" position="bottom-right" />
     </div>
   )
 }

@@ -312,19 +312,12 @@ function startStreamServer() {
         return
       }
 
-      // Read the full video from the drive
-      const data = await drive.get(video.drivePath)
-      if (!data) {
-        res.statusCode = 404
-        res.end('Video data not found in drive')
-        return
-      }
-
       // Handle Range requests for video seeking
       const rangeHeader = req.headers.range
-      const totalSize = data.length
+      // Use sizeBytes from metadata, fallback to 0 if not set
+      const totalSize = video.sizeBytes || 0
 
-      if (rangeHeader) {
+      if (rangeHeader && totalSize > 0) {
         const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/)
         if (rangeMatch) {
           const start = parseInt(rangeMatch[1], 10)
@@ -337,18 +330,24 @@ function startStreamServer() {
           res.setHeader('Content-Length', chunkSize)
           res.setHeader('Content-Type', 'video/mp4')
           res.setHeader('Access-Control-Allow-Origin', '*')
-          res.end(data.slice(start, end + 1))
+
+          const stream = drive.createReadStream(video.drivePath, { start, length: chunkSize })
+          stream.pipe(res)
           return
         }
       }
 
       // Full response
       res.statusCode = 200
-      res.setHeader('Content-Length', totalSize)
+      if (totalSize > 0) {
+        res.setHeader('Content-Length', totalSize)
+      }
       res.setHeader('Content-Type', 'video/mp4')
       res.setHeader('Accept-Ranges', 'bytes')
       res.setHeader('Access-Control-Allow-Origin', '*')
-      res.end(data)
+
+      const stream = drive.createReadStream(video.drivePath)
+      stream.pipe(res)
     } catch (err) {
       console.error('Stream server error:', err)
       res.statusCode = 500
