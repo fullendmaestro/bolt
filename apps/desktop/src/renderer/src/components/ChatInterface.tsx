@@ -5,11 +5,13 @@ import { createQvacModelAdapter } from '../lib/qvac-adapter'
 import type { ChannelEvent } from '../../../shared/types'
 
 interface ChatInterfaceProps {
-    loading: boolean
+    modelStatus: string
+    modelProgress: number
+    loadModel: () => void
     channelKey?: string | null
 }
 
-export function ChatInterface({ loading, channelKey }: ChatInterfaceProps): React.JSX.Element {
+export function ChatInterface({ modelStatus, modelProgress, loadModel, channelKey }: ChatInterfaceProps): React.JSX.Element {
     // Accumulate channel events for AI context injection
     const channelEventsRef = useRef<ChannelEvent[]>([])
 
@@ -50,13 +52,29 @@ export function ChatInterface({ loading, channelKey }: ChatInterfaceProps): Reac
         <div className="flex flex-col h-full bg-[#0F0F0F]">
             {/* Main Chat Interface Layout */}
             <div className="flex-1 overflow-hidden relative">
-                {loading ? (
-                    <div className="flex items-center justify-center h-full bg-[#0F0F0F]">
-                        <div className="flex gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 animate-bounce [animation-delay:0ms]" />
-                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 animate-bounce [animation-delay:150ms]" />
-                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 animate-bounce [animation-delay:300ms]" />
+                {modelStatus === 'idle' ? (
+                    <div className="flex flex-col items-center justify-center h-full bg-[#0F0F0F] text-neutral-400 gap-4">
+                        <p className="text-sm">Local AI Model is not loaded.</p>
+                        <button
+                            onClick={loadModel}
+                            className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                        >
+                            Download & Load Model
+                        </button>
+                    </div>
+                ) : modelStatus === 'downloading' ? (
+                    <div className="flex flex-col items-center justify-center h-full bg-[#0F0F0F] text-neutral-400 gap-4">
+                        <p className="text-sm text-center">
+                            Downloading Local AI Model...<br/>
+                            <span className="text-xs text-neutral-500">This may take a while depending on your connection.</span>
+                        </p>
+                        <div className="w-48 h-2 bg-neutral-800 rounded-full overflow-hidden mt-2 relative">
+                            <div
+                                className="h-full bg-indigo-500 transition-all duration-300"
+                                style={{ width: `${modelProgress}%` }}
+                            />
                         </div>
+                        <p className="text-xs font-mono">{Math.round(modelProgress)}%</p>
                     </div>
                 ) : (
                     /* Tailoring assistant-ui styles to sit perfectly inside the dark YouTube design language */

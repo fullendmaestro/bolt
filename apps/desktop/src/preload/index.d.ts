@@ -13,6 +13,8 @@ declare global {
       infer: (history: { role: string; content: string }[]) => Promise<void>
       unloadModel: () => Promise<string>
       onCompletionStream: (cb: (token: string) => void) => void
+      onModelProgress: (cb: (progress: any) => void) => void
+      removeModelProgressListener: () => void
 
       // Channel Management
       joinChannel: (channelKey: string) => Promise<void>

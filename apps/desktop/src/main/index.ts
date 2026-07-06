@@ -150,7 +150,10 @@ function setupHandlers(): void {
     modelId = await loadModel({
       modelSrc: LLAMA_3_2_1B_INST_Q4_0,
       modelType: 'llm',
-      onProgress: (progress) => console.log(progress)
+      onProgress: (progress) => {
+        console.log(progress)
+        win?.webContents.send('model-progress', progress)
+      }
     })
     return 'model loaded'
   })
