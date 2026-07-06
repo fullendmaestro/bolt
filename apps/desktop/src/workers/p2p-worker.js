@@ -135,11 +135,18 @@ async function getFeed() {
       if (!metadata) continue
 
       const channelName = metadata.name || 'Unknown Channel'
-      const channelAvatar = metadata.avatar || ''
+      const channelAvatar = metadata.avatar 
+        ? `http://127.0.0.1:${STREAM_PORT}/stream/${channelKey}${metadata.avatar}`
+        : ''
 
       for (const video of (metadata.videos || [])) {
         items.push({
-          video,
+          video: {
+            ...video,
+            thumbnailPath: video.thumbnailPath
+              ? `http://127.0.0.1:${STREAM_PORT}/stream/${channelKey}${video.thumbnailPath}`
+              : ''
+          },
           channelKey,
           channelName,
           channelAvatar
@@ -322,8 +329,15 @@ async function getUploads() {
             publicKey: ownChannelKey,
             name: metadata.name,
             description: metadata.description,
-            avatar: metadata.avatar,
-            videos: metadata.videos || []
+            avatar: metadata.avatar
+              ? `http://127.0.0.1:${STREAM_PORT}/stream/${ownChannelKey}${metadata.avatar}`
+              : '',
+            videos: (metadata.videos || []).map(v => ({
+              ...v,
+              thumbnailPath: v.thumbnailPath
+                ? `http://127.0.0.1:${STREAM_PORT}/stream/${ownChannelKey}${v.thumbnailPath}`
+                : ''
+            }))
           }
         : null
     })
@@ -335,9 +349,10 @@ async function getUploads() {
 // ── Streaming HTTP Server ──────────────────────────────────
 
 function startStreamServer() {
-  if (streamServer) return
+  if (streamServer) return Promise.resolve()
 
-  streamServer = http.createServer(async (req, res) => {
+  return new Promise((resolve) => {
+    streamServer = http.createServer(async (req, res) => {
     // Always set CORS headers first (covers preflight and all responses)
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
@@ -495,17 +510,15 @@ function startStreamServer() {
   streamServer.listen(0, '127.0.0.1', () => {
     STREAM_PORT = streamServer.address().port
     console.log('[Bolt] Stream server listening on http://127.0.0.1:' + STREAM_PORT)
+    resolve()
+  })
   })
 }
 
 async function startStream(channelKey, videoId) {
   try {
-    // Ensure the streaming server is running and wait for it to bind
-    if (!streamServer) {
-      await new Promise((resolve) => {
-        startStreamServer()
-        streamServer.once('listening', resolve)
-      })
+    if (!streamServer || STREAM_PORT === 0) {
+      await startStreamServer()
     }
 
     const url = 'http://127.0.0.1:' + STREAM_PORT + '/stream/' + channelKey + '/' + videoId
@@ -696,4 +709,9 @@ goodbye(async () => {
 })
 
 // ── Signal readiness ───────────────────────────────────────
-send({ type: 'worker-ready' })
+startStreamServer().then(() => {
+  send({ type: 'worker-ready' })
+}).catch(err => {
+  console.error('Failed to start stream server:', err)
+  send({ type: 'worker-ready' }) // Still signal ready so UI doesn't hang
+})
