@@ -19,7 +19,7 @@ export function VideoCard({ stream }: { stream: Stream }) {
   return (
     <div
       className="flex flex-col gap-3 group cursor-pointer"
-      onClick={() => navigate(`/watch/${stream.id}`)}
+      onClick={() => navigate(`/watch/${stream.id}`, { state: { stream } })}
     >
       <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-neutral-900 border border-white/5">
         <img

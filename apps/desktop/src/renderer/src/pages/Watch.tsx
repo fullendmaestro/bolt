@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ThumbsUp, ThumbsDown, Share2, MoreHorizontal, Loader2, Wifi, Download, CheckCircle2 } from 'lucide-react'
 import { ChatInterface } from '../components/ChatInterface'
@@ -17,6 +17,9 @@ export function Watch({
   loadModel: () => void
 }) {
   const { id } = useParams()
+  const location = useLocation()
+  const stream = location.state?.stream
+  
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const [joined, setJoined] = useState(false)
@@ -87,8 +90,9 @@ export function Watch({
     }
   }
 
-  const displayTitle = channelKey ? `Stream from ${channelKey.slice(0, 8)}...` : 'Unknown Stream'
-  const displayChannel = channelKey ? `Channel ${channelKey.slice(0, 12)}...` : 'Unknown'
+  const displayTitle = stream?.title || (channelKey ? `Stream from ${channelKey.slice(0, 8)}...` : 'Unknown Stream')
+  const displayChannel = stream?.channel || (channelKey ? `Channel ${channelKey.slice(0, 12)}...` : 'Unknown')
+  const displayAvatar = stream?.avatar || null
 
   return (
     <div className="mx-auto max-w-[1800px] p-4 lg:p-6 flex flex-col lg:flex-row gap-6">
@@ -155,6 +159,16 @@ export function Watch({
           </h1>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
+              {displayAvatar ? (
+                <img
+                  src={displayAvatar}
+                  className="h-10 w-10 rounded-full border border-neutral-700 object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-sm font-bold">
+                  {displayChannel.charAt(0)}
+                </div>
+              )}
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-[#F1F1F1]">{displayChannel}</span>
                 <span className="text-xs text-[#AAAAAA]">

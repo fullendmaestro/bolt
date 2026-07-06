@@ -321,6 +321,10 @@ async function getUploads() {
       return
     }
 
+    if (!streamServer || STREAM_PORT === 0) {
+      await startStreamServer()
+    }
+
     const metadata = await readDriveJSON(ownDrive, '/metadata.json')
     send({
       type: 'uploads-data',

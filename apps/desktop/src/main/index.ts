@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
@@ -288,6 +289,15 @@ function setupHandlers(): void {
 
 // ── App Lifecycle ──────────────────────────────────────────
 app.whenReady().then(() => {
+  protocol.handle('local-asset', (request) => {
+    let filePath = request.url.slice('local-asset://'.length)
+    if (process.platform === 'win32' && filePath.startsWith('/')) {
+      filePath = filePath.slice(1) // handle Windows /C:/...
+    }
+    filePath = decodeURIComponent(filePath)
+    return net.fetch(pathToFileURL(filePath).toString())
+  })
+
   electronApp.setAppUserModelId('com.bolt.sports')
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

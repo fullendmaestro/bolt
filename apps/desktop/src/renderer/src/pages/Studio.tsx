@@ -116,8 +116,7 @@ export function Studio() {
       const result = await window.qvacAPI.selectAvatar()
       if (!result.canceled && result.filePath) {
         setAvatarPath(result.filePath)
-        // Create an object URL for preview using fetch (Electron allows file:// in preload context)
-        setAvatarPreview('file://' + result.filePath)
+        setAvatarPreview('local-asset://' + encodeURIComponent(result.filePath))
       }
     } catch (err) {
       console.error('Avatar selection failed:', err)
@@ -129,7 +128,7 @@ export function Studio() {
       const result = await window.qvacAPI.selectThumbnail()
       if (!result.canceled && result.filePath) {
         setThumbnailPath(result.filePath)
-        setThumbnailPreview('file://' + result.filePath)
+        setThumbnailPreview('local-asset://' + encodeURIComponent(result.filePath))
       }
     } catch (err) {
       console.error('Thumbnail selection failed:', err)
@@ -437,7 +436,11 @@ export function Studio() {
                 >
                   <div className="col-span-6 md:col-span-5 flex gap-4 items-center">
                     <div className="relative h-16 w-28 rounded-lg overflow-hidden shrink-0 bg-neutral-900 flex items-center justify-center">
-                      <FileVideo className="h-6 w-6 text-neutral-600" />
+                      {video.thumbnailPath ? (
+                        <img src={video.thumbnailPath} alt={video.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <FileVideo className="h-6 w-6 text-neutral-600" />
+                      )}
                       {video.duration && (
                         <div className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-[10px] font-medium text-white">
                           {video.duration}
