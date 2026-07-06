@@ -12,19 +12,28 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   joinChannel: (channelKey: string) => ipcRenderer.invoke('channel:join', channelKey),
   leaveChannel: (channelKey: string) => ipcRenderer.invoke('channel:leave', channelKey),
   getJoinedChannels: () => ipcRenderer.invoke('channel:list'),
-  initChannel: (name: string, description: string) =>
-    ipcRenderer.invoke('channel:init', name, description),
+  initChannel: (name: string, description: string, avatarPath?: string) =>
+    ipcRenderer.invoke('channel:init', name, description, avatarPath),
+
+  // ── Asset Selectors (via Electron dialog) ─────────────────
+  selectAvatar: () => ipcRenderer.invoke('channel:select-avatar'),
+  selectThumbnail: () => ipcRenderer.invoke('video:select-thumbnail'),
 
   // ── Feed ──────────────────────────────────────────────────
   getFeed: () => ipcRenderer.invoke('feed:get'),
 
   // ── Upload / Studio ───────────────────────────────────────
-  selectAndUploadVideo: (title: string) => ipcRenderer.invoke('video:select-and-upload', title),
+  selectAndUploadVideo: (title: string, thumbnailPath?: string) =>
+    ipcRenderer.invoke('video:select-and-upload', title, thumbnailPath),
   getUploads: () => ipcRenderer.invoke('uploads:get'),
 
   // ── Streaming ─────────────────────────────────────────────
   getStreamUrl: (channelKey: string, videoId: string) =>
     ipcRenderer.invoke('stream:start', channelKey, videoId),
+
+  // ── Download & Seed ───────────────────────────────────────
+  downloadVideo: (channelKey: string, videoId: string) =>
+    ipcRenderer.invoke('video:download', channelKey, videoId),
 
   // ── Live Events (AI Context) ──────────────────────────────
   onChannelEvent: (cb: (event: any) => void) => {

@@ -21,6 +21,8 @@ export interface VideoEntry {
   drivePath: string
   /** Whether this is a live broadcast */
   isLive: boolean
+  /** Hyperdrive path to the video thumbnail image (optional) */
+  thumbnailPath?: string
 }
 
 /** Metadata for a Channel (a user's persistent Hyperdrive) */
@@ -31,7 +33,7 @@ export interface ChannelMetadata {
   name: string
   /** Optional description */
   description: string
-  /** Avatar URL or data URI */
+  /** Drive path to the channel avatar image (e.g., /assets/avatar.jpg) */
   avatar: string
   /** List of video entries in this channel */
   videos: VideoEntry[]
@@ -65,11 +67,12 @@ export type P2PCommand =
   | { type: 'join-channel'; channelKey: string }
   | { type: 'leave-channel'; channelKey: string }
   | { type: 'get-feed' }
-  | { type: 'init-channel'; name: string; description: string }
-  | { type: 'upload-video'; filePath: string; title: string; duration: string }
+  | { type: 'init-channel'; name: string; description: string; avatarPath?: string }
+  | { type: 'upload-video'; filePath: string; title: string; duration: string; thumbnailPath?: string }
   | { type: 'get-uploads' }
   | { type: 'start-stream'; channelKey: string; videoId: string }
   | { type: 'inject-event'; event: Omit<ChannelEvent, 'channelKey'> }
+  | { type: 'download-video'; channelKey: string; videoId: string; destinationPath: string }
 
 // ============================================================
 // IPC Responses: Worker → Main → Renderer
@@ -86,4 +89,6 @@ export type P2PResponse =
   | { type: 'uploads-data'; channel: ChannelMetadata | null }
   | { type: 'stream-url'; url: string; channelKey: string; videoId: string }
   | { type: 'channel-event'; event: ChannelEvent }
+  | { type: 'download-progress'; videoId: string; channelKey: string; percent: number; bytesReceived: number; totalBytes: number }
+  | { type: 'download-complete'; videoId: string; channelKey: string; destinationPath: string }
   | { type: 'error'; message: string; command?: string }

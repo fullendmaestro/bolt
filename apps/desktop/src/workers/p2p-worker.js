@@ -160,9 +160,39 @@ async function getFeed() {
   }
 }
 
+// ── MIME type helper ──────────────────────────────────────
+
+function getMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase()
+  const types = {
+    '.mp4': 'video/mp4',
+    '.mkv': 'video/x-matroska',
+    '.webm': 'video/webm',
+    '.avi': 'video/x-msvideo',
+    '.mov': 'video/quicktime',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  }
+  return types[ext] || 'application/octet-stream'
+}
+
+// Pipe a bare-fs readable into a Hyperdrive writable, returning a Promise
+function pipeToHyperdrive(sourceStream, driveWriteStream) {
+  return new Promise((resolve, reject) => {
+    sourceStream.on('error', reject)
+    driveWriteStream.on('error', reject)
+    driveWriteStream.on('finish', resolve)
+    driveWriteStream.on('close', resolve)
+    sourceStream.pipe(driveWriteStream)
+  })
+}
+
 // ── Channel Initialization (for channel owners) ────────────
 
-async function initChannel(name, description) {
+async function initChannel(name, description, avatarPath) {
   try {
     if (ownDrive) {
       // Already initialized — return existing key
@@ -175,11 +205,26 @@ async function initChannel(name, description) {
 
     ownChannelKey = b4a.toString(ownDrive.key, 'hex')
 
+    // Write avatar to drive if provided
+    let avatarDrivePath = ''
+    if (avatarPath) {
+      try {
+        const ext = path.extname(avatarPath).toLowerCase() || '.jpg'
+        avatarDrivePath = '/assets/avatar' + ext
+        const readStream = fs.createReadStream(avatarPath)
+        const writeStream = ownDrive.createWriteStream(avatarDrivePath)
+        await pipeToHyperdrive(readStream, writeStream)
+      } catch (avatarErr) {
+        console.error('[initChannel] Avatar upload failed:', avatarErr.message)
+        avatarDrivePath = ''
+      }
+    }
+
     // Write initial metadata
     const metadata = {
       name,
       description,
-      avatar: '',
+      avatar: avatarDrivePath,
       videos: []
     }
     await writeDriveJSON(ownDrive, '/metadata.json', metadata)
@@ -202,22 +247,37 @@ async function initChannel(name, description) {
 
 // ── Video Upload ───────────────────────────────────────────
 
-async function uploadVideo(filePath, title, duration) {
+async function uploadVideo(filePath, title, duration, thumbnailPath) {
   try {
     if (!ownDrive) {
       // Auto-initialize the channel if not done
-      await initChannel('My Bolt Node', 'Personal sports channel')
+      await initChannel('My Bolt Node', 'Personal sports channel', null)
     }
 
     const videoId = generateVideoId()
     const filename = path.basename(filePath)
     const drivePath = '/videos/' + videoId + '/' + filename
 
-    // Read the file and write to the Hyperdrive
-    const fileData = fs.readFileSync(filePath)
-    await ownDrive.put(drivePath, fileData)
-
+    // Memory-safe streaming upload: pipe directly from OS file → Hyperdrive
     const stat = fs.statSync(filePath)
+    const readStream = fs.createReadStream(filePath)
+    const writeStream = ownDrive.createWriteStream(drivePath)
+    await pipeToHyperdrive(readStream, writeStream)
+
+    // Upload thumbnail if provided
+    let thumbnailDrivePath = undefined
+    if (thumbnailPath) {
+      try {
+        const thumbExt = path.extname(thumbnailPath).toLowerCase() || '.jpg'
+        thumbnailDrivePath = '/videos/' + videoId + '/thumb' + thumbExt
+        const thumbRead = fs.createReadStream(thumbnailPath)
+        const thumbWrite = ownDrive.createWriteStream(thumbnailDrivePath)
+        await pipeToHyperdrive(thumbRead, thumbWrite)
+      } catch (thumbErr) {
+        console.error('[uploadVideo] Thumbnail upload failed:', thumbErr.message)
+        thumbnailDrivePath = undefined
+      }
+    }
 
     const videoEntry = {
       id: videoId,
@@ -227,7 +287,8 @@ async function uploadVideo(filePath, title, duration) {
       duration: duration || '0:00',
       filename,
       drivePath,
-      isLive: false
+      isLive: false,
+      ...(thumbnailDrivePath ? { thumbnailPath: thumbnailDrivePath } : {})
     }
 
     // Update metadata
@@ -277,8 +338,24 @@ function startStreamServer() {
   if (streamServer) return
 
   streamServer = http.createServer(async (req, res) => {
+    // Always set CORS headers first (covers preflight and all responses)
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type')
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length')
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204
+      res.end()
+      return
+    }
+
     try {
-      // Parse URL: /stream/<channelKey>/<videoId>
+      // URL format:
+      //   /stream/<channelKey>/video/<videoId>          → video file
+      //   /stream/<channelKey>/assets/<filename>        → image asset
+      //   /stream/<channelKey>/<videoId>               → legacy video (backward compat)
       const parts = req.url.split('/').filter(Boolean)
 
       if (parts[0] !== 'stream' || parts.length < 3) {
@@ -288,8 +365,6 @@ function startStreamServer() {
       }
 
       const channelKey = parts[1]
-      const videoId = parts[2]
-
       const drive = joinedDrives.get(channelKey)
       if (!drive) {
         res.statusCode = 404
@@ -297,7 +372,44 @@ function startStreamServer() {
         return
       }
 
-      // Read metadata to find the video path
+      // ── Asset request: /stream/<channelKey>/assets/<filename> ──
+      if (parts[2] === 'assets' && parts[3]) {
+        const assetDrivePath = '/assets/' + parts[3]
+        const assetBuf = await drive.get(assetDrivePath)
+        if (!assetBuf) {
+          res.statusCode = 404
+          res.end('Asset not found')
+          return
+        }
+        res.statusCode = 200
+        res.setHeader('Content-Type', getMimeType(parts[3]))
+        res.setHeader('Content-Length', assetBuf.byteLength)
+        res.setHeader('Cache-Control', 'public, max-age=3600')
+        res.end(assetBuf)
+        return
+      }
+
+      // ── Thumbnail request: /stream/<channelKey>/videos/<videoId>/thumb.<ext> ──
+      if (parts[2] === 'videos' && parts[4] && parts[4].startsWith('thumb')) {
+        const thumbDrivePath = '/videos/' + parts[3] + '/' + parts[4]
+        const thumbBuf = await drive.get(thumbDrivePath)
+        if (!thumbBuf) {
+          res.statusCode = 404
+          res.end('Thumbnail not found')
+          return
+        }
+        res.statusCode = 200
+        res.setHeader('Content-Type', getMimeType(parts[4]))
+        res.setHeader('Content-Length', thumbBuf.byteLength)
+        res.setHeader('Cache-Control', 'public, max-age=3600')
+        res.end(thumbBuf)
+        return
+      }
+
+      // ── Video stream request ──
+      // Support both /stream/<channelKey>/<videoId> and /stream/<channelKey>/video/<videoId>
+      const videoId = parts[2] === 'video' ? parts[3] : parts[2]
+
       const metadata = await readDriveJSON(drive, '/metadata.json')
       if (!metadata) {
         res.statusCode = 404
@@ -312,52 +424,77 @@ function startStreamServer() {
         return
       }
 
-      // Handle Range requests for video seeking
-      const rangeHeader = req.headers.range
-      // Use sizeBytes from metadata, fallback to 0 if not set
       const totalSize = video.sizeBytes || 0
+      const contentType = getMimeType(video.filename || video.drivePath)
 
+      // ── RFC 7233 Partial Content (range requests for seeking) ──
+      const rangeHeader = req.headers['range'] || req.headers['Range']
       if (rangeHeader && totalSize > 0) {
         const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/)
         if (rangeMatch) {
           const start = parseInt(rangeMatch[1], 10)
-          const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : totalSize - 1
+          // Clamp end to totalSize-1 per RFC 7233 §2.1
+          const end = rangeMatch[2]
+            ? Math.min(parseInt(rangeMatch[2], 10), totalSize - 1)
+            : totalSize - 1
+
+          if (start > end || start >= totalSize) {
+            res.statusCode = 416 // Range Not Satisfiable
+            res.setHeader('Content-Range', 'bytes */' + totalSize)
+            res.end()
+            return
+          }
+
           const chunkSize = end - start + 1
 
           res.statusCode = 206
           res.setHeader('Content-Range', 'bytes ' + start + '-' + end + '/' + totalSize)
           res.setHeader('Accept-Ranges', 'bytes')
-          res.setHeader('Content-Length', chunkSize)
-          res.setHeader('Content-Type', 'video/mp4')
-          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.setHeader('Content-Length', String(chunkSize))
+          res.setHeader('Content-Type', contentType)
 
           const stream = drive.createReadStream(video.drivePath, { start, length: chunkSize })
+          stream.on('error', (err) => {
+            console.error('[streamServer] Range stream error:', err.message)
+            if (!res.headersSent) {
+              res.statusCode = 500
+              res.end('Stream error')
+            }
+          })
           stream.pipe(res)
           return
         }
       }
 
-      // Full response
+      // ── Full (non-range) response ──
       res.statusCode = 200
-      if (totalSize > 0) {
-        res.setHeader('Content-Length', totalSize)
-      }
-      res.setHeader('Content-Type', 'video/mp4')
       res.setHeader('Accept-Ranges', 'bytes')
-      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Content-Type', contentType)
+      if (totalSize > 0) {
+        res.setHeader('Content-Length', String(totalSize))
+      }
 
       const stream = drive.createReadStream(video.drivePath)
+      stream.on('error', (err) => {
+        console.error('[streamServer] Full stream error:', err.message)
+        if (!res.headersSent) {
+          res.statusCode = 500
+          res.end('Stream error')
+        }
+      })
       stream.pipe(res)
     } catch (err) {
-      console.error('Stream server error:', err)
-      res.statusCode = 500
-      res.end('Internal Server Error')
+      console.error('[streamServer] Unhandled error:', err)
+      if (!res.headersSent) {
+        res.statusCode = 500
+        res.end('Internal Server Error')
+      }
     }
   })
 
   streamServer.listen(0, '127.0.0.1', () => {
     STREAM_PORT = streamServer.address().port
-    console.log('Bolt stream server listening on http://127.0.0.1:' + STREAM_PORT)
+    console.log('[Bolt] Stream server listening on http://127.0.0.1:' + STREAM_PORT)
   })
 }
 
@@ -426,6 +563,64 @@ async function injectEvent(event) {
   }
 }
 
+// ── Download & Seed ────────────────────────────────────────
+
+async function downloadVideo(channelKey, videoId, destinationPath) {
+  try {
+    const drive = joinedDrives.get(channelKey)
+    if (!drive) {
+      send({ type: 'error', message: 'Channel not joined', command: 'download-video' })
+      return
+    }
+
+    const metadata = await readDriveJSON(drive, '/metadata.json')
+    if (!metadata) {
+      send({ type: 'error', message: 'Channel metadata not found', command: 'download-video' })
+      return
+    }
+
+    const video = (metadata.videos || []).find((v) => v.id === videoId)
+    if (!video) {
+      send({ type: 'error', message: 'Video not found in channel', command: 'download-video' })
+      return
+    }
+
+    const totalBytes = video.sizeBytes || 0
+    let bytesReceived = 0
+
+    const readStream = drive.createReadStream(video.drivePath)
+    const writeStream = fs.createWriteStream(destinationPath)
+
+    readStream.on('error', (err) => {
+      console.error('[downloadVideo] Read error:', err.message)
+      writeStream.destroy()
+      send({ type: 'error', message: 'Download failed: ' + err.message, command: 'download-video' })
+    })
+
+    writeStream.on('error', (err) => {
+      console.error('[downloadVideo] Write error:', err.message)
+      readStream.destroy()
+      send({ type: 'error', message: 'Download write failed: ' + err.message, command: 'download-video' })
+    })
+
+    readStream.on('data', (chunk) => {
+      bytesReceived += chunk.byteLength || chunk.length || 0
+      const percent = totalBytes > 0 ? Math.round((bytesReceived / totalBytes) * 100) : 0
+      send({ type: 'download-progress', videoId, channelKey, percent, bytesReceived, totalBytes })
+    })
+
+    writeStream.on('finish', () => {
+      // Corestore has now cached all blocks — this node is seeding!
+      send({ type: 'download-complete', videoId, channelKey, destinationPath })
+      console.log('[downloadVideo] Complete. Now seeding:', destinationPath)
+    })
+
+    readStream.pipe(writeStream)
+  } catch (err) {
+    send({ type: 'error', message: err.message, command: 'download-video' })
+  }
+}
+
 // ── IPC Message Handler ────────────────────────────────────
 
 pipe.on('data', async (data) => {
@@ -448,10 +643,10 @@ pipe.on('data', async (data) => {
         await getFeed()
         break
       case 'init-channel':
-        await initChannel(msg.name, msg.description)
+        await initChannel(msg.name, msg.description, msg.avatarPath || null)
         break
       case 'upload-video':
-        await uploadVideo(msg.filePath, msg.title, msg.duration)
+        await uploadVideo(msg.filePath, msg.title, msg.duration, msg.thumbnailPath || null)
         break
       case 'get-uploads':
         await getUploads()
@@ -461,6 +656,9 @@ pipe.on('data', async (data) => {
         break
       case 'inject-event':
         await injectEvent(msg.event)
+        break
+      case 'download-video':
+        await downloadVideo(msg.channelKey, msg.videoId, msg.destinationPath)
         break
       default:
         console.log('Unknown command:', msg.type)

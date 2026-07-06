@@ -1,17 +1,20 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ThumbsUp, ThumbsDown, Share2, MoreHorizontal, PlayCircle, Loader2, Wifi } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Share2, MoreHorizontal, PlayCircle, Loader2, Wifi, Download, CheckCircle2 } from 'lucide-react'
 import { MOCK_STREAMS } from '../lib/data'
 import { ChatInterface } from '../components/ChatInterface'
 
 type ConnectionState = 'connecting' | 'buffering' | 'streaming' | 'error'
+type DownloadState = 'idle' | 'downloading' | 'complete'
 
 export function Watch({ modelLoading }: { modelLoading: boolean }) {
   const { id } = useParams()
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const [joined, setJoined] = useState(false)
+  const [downloadState, setDownloadState] = useState<DownloadState>('idle')
+  const [downloadProgress, setDownloadProgress] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Parse compound ID (channelKey:videoId) or fall back to mock
@@ -34,6 +37,16 @@ export function Watch({ modelLoading }: { modelLoading: boolean }) {
       } else if (msg.type === 'error' && msg.command === 'start-stream') {
         setConnectionState('error')
         toast.error(`Failed to load stream: ${msg.message}`)
+      } else if (msg.type === 'download-progress' && msg.channelKey === channelKey && msg.videoId === videoId) {
+        setDownloadProgress(msg.percent)
+        setDownloadState('downloading')
+      } else if (msg.type === 'download-complete' && msg.channelKey === channelKey && msg.videoId === videoId) {
+        setDownloadState('complete')
+        setDownloadProgress(100)
+        toast.success('Download complete! Your node is now seeding this video.')
+      } else if (msg.type === 'error' && msg.command === 'download-video') {
+        setDownloadState('idle')
+        toast.error(`Download failed: ${msg.message}`)
       }
     }
 
@@ -54,6 +67,20 @@ export function Watch({ modelLoading }: { modelLoading: boolean }) {
     } catch (err: any) {
       console.error('Failed to join channel:', err)
       toast.error(`Failed to join channel: ${err.message || 'Unknown error'}`)
+    }
+  }
+
+  const handleDownloadAndSeed = async () => {
+    if (!channelKey || !videoId || downloadState !== 'idle') return
+    try {
+      const result = await window.qvacAPI.downloadVideo(channelKey, videoId)
+      if (result.canceled) return
+      setDownloadState('downloading')
+      setDownloadProgress(0)
+      toast.info('Download started — your node will seed after completion.')
+    } catch (err: any) {
+      console.error('Download failed:', err)
+      toast.error(`Could not start download: ${err.message || 'Unknown error'}`)
     }
   }
 
@@ -196,6 +223,40 @@ export function Watch({ modelLoading }: { modelLoading: boolean }) {
                 <Share2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Share Channel</span>
               </button>
+
+              {/* Download & Seed — only for real P2P streams */}
+              {isP2PId && (
+                <button
+                  onClick={handleDownloadAndSeed}
+                  disabled={downloadState !== 'idle'}
+                  title="Download to disk and become a seeder for this video"
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    downloadState === 'complete'
+                      ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                      : downloadState === 'downloading'
+                        ? 'bg-indigo-500/20 text-indigo-400 cursor-default'
+                        : 'bg-white/10 hover:bg-white/20'
+                  }`}
+                >
+                  {downloadState === 'complete' ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Seeding</span>
+                    </>
+                  ) : downloadState === 'downloading' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="hidden sm:inline">{downloadProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      <span className="hidden sm:inline">Download & Seed</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               <button className="flex items-center justify-center bg-white/10 rounded-full w-9 h-9 hover:bg-white/20 transition-colors">
                 <MoreHorizontal className="h-5 w-5" />
               </button>

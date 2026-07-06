@@ -195,8 +195,29 @@ function setupHandlers(): void {
     return localStore.get('joinedChannels', [])
   })
 
-  ipcMain.handle('channel:init', async (_event, name: string, description: string) => {
-    sendToWorker({ type: 'init-channel', name, description })
+  ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
+    sendToWorker({ type: 'init-channel', name, description, avatarPath })
+  })
+
+  // ── Avatar / Thumbnail Selectors ──────────────────────
+  ipcMain.handle('channel:select-avatar', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Channel Avatar',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+    return { canceled: false, filePath: result.filePaths[0] }
+  })
+
+  ipcMain.handle('video:select-thumbnail', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Video Thumbnail',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+    return { canceled: false, filePath: result.filePaths[0] }
   })
 
   // ── Feed Handler ──────────────────────────────────────
@@ -205,7 +226,7 @@ function setupHandlers(): void {
   })
 
   // ── Upload Handlers ───────────────────────────────────
-  ipcMain.handle('video:select-and-upload', async (_event, title: string) => {
+  ipcMain.handle('video:select-and-upload', async (_event, title: string, thumbnailPath?: string) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
@@ -220,7 +241,8 @@ function setupHandlers(): void {
       type: 'upload-video',
       filePath,
       title: title || 'Untitled Upload',
-      duration: '0:00'
+      duration: '0:00',
+      thumbnailPath
     })
     return { canceled: false, filePath }
   })
@@ -232,6 +254,18 @@ function setupHandlers(): void {
   // ── Streaming Handler ─────────────────────────────────
   ipcMain.handle('stream:start', async (_event, channelKey: string, videoId: string) => {
     sendToWorker({ type: 'start-stream', channelKey, videoId })
+  })
+
+  // ── Download & Seed Handler ───────────────────────────
+  ipcMain.handle('video:download', async (_event, channelKey: string, videoId: string) => {
+    const result = await dialog.showSaveDialog({
+      title: 'Save Video',
+      defaultPath: videoId + '.mp4',
+      filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
+    })
+    if (result.canceled || !result.filePath) return { canceled: true }
+    sendToWorker({ type: 'download-video', channelKey, videoId, destinationPath: result.filePath })
+    return { canceled: false, destinationPath: result.filePath }
   })
 
   // ── Event Injection Handler ───────────────────────────

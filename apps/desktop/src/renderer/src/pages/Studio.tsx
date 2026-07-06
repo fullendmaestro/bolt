@@ -9,6 +9,8 @@ import {
   Copy,
   Check,
   FileVideo,
+  ImagePlus,
+  X,
 } from 'lucide-react'
 import type { ChannelMetadata, VideoEntry } from '../../../shared/types'
 
@@ -38,6 +40,12 @@ export function Studio() {
   const [channelName, setChannelName] = useState('')
   const [channelDesc, setChannelDesc] = useState('')
   const [initError, setInitError] = useState<string | null>(null)
+  const [avatarPath, setAvatarPath] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+
+  // Upload state
+  const [thumbnailPath, setThumbnailPath] = useState<string | null>(null)
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
 
   // Set up a persistent, global P2P message listener for the lifetime of this page
   useEffect(() => {
@@ -94,7 +102,7 @@ export function Studio() {
     setInitializing(true)
     setInitError(null)
     try {
-      await window.qvacAPI.initChannel(channelName.trim(), channelDesc.trim())
+      await window.qvacAPI.initChannel(channelName.trim(), channelDesc.trim(), avatarPath || undefined)
       // `channel-initialized` worker message will finalize state and close modal
     } catch (err: any) {
       console.error('Failed to init channel:', err)
@@ -103,12 +111,44 @@ export function Studio() {
     }
   }
 
+  const handleSelectAvatar = async () => {
+    try {
+      const result = await window.qvacAPI.selectAvatar()
+      if (!result.canceled && result.filePath) {
+        setAvatarPath(result.filePath)
+        // Create an object URL for preview using fetch (Electron allows file:// in preload context)
+        setAvatarPreview('file://' + result.filePath)
+      }
+    } catch (err) {
+      console.error('Avatar selection failed:', err)
+    }
+  }
+
+  const handleSelectThumbnail = async () => {
+    try {
+      const result = await window.qvacAPI.selectThumbnail()
+      if (!result.canceled && result.filePath) {
+        setThumbnailPath(result.filePath)
+        setThumbnailPreview('file://' + result.filePath)
+      }
+    } catch (err) {
+      console.error('Thumbnail selection failed:', err)
+    }
+  }
+
   const handleSelectAndUpload = async () => {
     setUploading(true)
     try {
-      const result = await window.qvacAPI.selectAndUploadVideo(uploadTitle || 'Untitled Upload')
+      const result = await window.qvacAPI.selectAndUploadVideo(
+        uploadTitle || 'Untitled Upload',
+        thumbnailPath || undefined
+      )
       if (result.canceled) {
         setUploading(false)
+      } else {
+        // Reset thumbnail after initiating upload
+        setThumbnailPath(null)
+        setThumbnailPreview(null)
       }
       // Upload progress will come via worker messages
     } catch (err) {
@@ -146,6 +186,38 @@ export function Studio() {
                   {initError}
                 </div>
               )}
+
+              {/* Avatar Picker */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-neutral-400 uppercase">Channel Avatar</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative h-16 w-16 rounded-full bg-neutral-800 border-2 border-dashed border-neutral-700 overflow-hidden flex items-center justify-center shrink-0">
+                    {avatarPreview ? (
+                      <>
+                        <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => { setAvatarPath(null); setAvatarPreview(null) }}
+                          className="absolute top-0 right-0 bg-black/70 rounded-full p-0.5 text-white"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <ImagePlus className="h-5 w-5 text-neutral-600" />
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSelectAvatar}
+                    className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs"
+                  >
+                    {avatarPreview ? 'Change Image' : 'Select Image'}
+                  </Button>
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <label htmlFor="name" className="text-xs font-semibold text-neutral-400 uppercase">
                   Channel Name <span className="text-red-400">*</span>
@@ -289,6 +361,30 @@ export function Studio() {
               placeholder="Video title..."
               className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 rounded-xl"
             />
+          </div>
+
+          {/* Thumbnail picker */}
+          <div className="flex items-center gap-3 mb-4">
+            {thumbnailPreview ? (
+              <div className="relative h-12 w-20 rounded-lg overflow-hidden shrink-0">
+                <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                <button
+                  onClick={() => { setThumbnailPath(null); setThumbnailPreview(null) }}
+                  className="absolute top-0 right-0 bg-black/70 rounded-full p-0.5 text-white"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleSelectThumbnail}
+              className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs"
+            >
+              <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
+              {thumbnailPreview ? 'Change Thumbnail' : 'Add Thumbnail'}
+            </Button>
           </div>
 
           <Button

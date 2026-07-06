@@ -18,17 +18,24 @@ declare global {
       joinChannel: (channelKey: string) => Promise<void>
       leaveChannel: (channelKey: string) => Promise<void>
       getJoinedChannels: () => Promise<string[]>
-      initChannel: (name: string, description: string) => Promise<void>
+      initChannel: (name: string, description: string, avatarPath?: string) => Promise<void>
+
+      // Asset Selectors
+      selectAvatar: () => Promise<{ canceled: boolean; filePath?: string }>
+      selectThumbnail: () => Promise<{ canceled: boolean; filePath?: string }>
 
       // Feed
       getFeed: () => Promise<void>
 
       // Upload / Studio
-      selectAndUploadVideo: (title: string) => Promise<{ canceled: boolean; filePath?: string }>
+      selectAndUploadVideo: (title: string, thumbnailPath?: string) => Promise<{ canceled: boolean; filePath?: string }>
       getUploads: () => Promise<void>
 
       // Streaming
       getStreamUrl: (channelKey: string, videoId: string) => Promise<void>
+
+      // Download & Seed
+      downloadVideo: (channelKey: string, videoId: string) => Promise<{ canceled: boolean; destinationPath?: string }>
 
       // Live Events (AI Context)
       onChannelEvent: (cb: (event: ChannelEvent) => void) => void
