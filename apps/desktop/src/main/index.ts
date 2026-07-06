@@ -21,14 +21,18 @@ let win: BrowserWindow | null = null
 let modelId: string | null = null
 let workerPipe: any = null
 
-// Check for custom user-data-dir
-for (const arg of process.argv) {
-  if (arg.startsWith('--user-data-dir=')) {
-    const dir = arg.replace('--user-data-dir=', '')
-    app.setPath('userData', join(process.cwd(), dir))
-    break
-  }
+// --- Strict Instance Isolation ---
+// Parse custom user data directory for multi-peer local testing
+const userDataArg = process.argv.find((arg) =>
+  arg.startsWith('--user-data-dir=')
+)
+if (userDataArg) {
+  const dir = userDataArg.replace('--user-data-dir=', '')
+  const absolutePath = join(process.cwd(), dir)
+  app.setPath('userData', absolutePath)
+  console.log(`[Instance Isolation] userData path set to: ${absolutePath}`)
 }
+// ---------------------------------
 
 // ── Local Persistence ──────────────────────────────────────
 interface StoreSchema {
@@ -106,7 +110,8 @@ function handleWorkerMessage(message: P2PResponse): void {
 
 function initP2PWorker(): void {
   const appName = 'BoltSports'
-  const storageDir = app.getPath('userData')
+  // Use the isolated app.getPath('userData') so corestore stays separated!
+  const storageDir = join(app.getPath('userData'), 'holepunch-storage')
   const workerPath = join(__dirname, 'worker.js')
 
   const worker = PearRuntime.run(workerPath, [
