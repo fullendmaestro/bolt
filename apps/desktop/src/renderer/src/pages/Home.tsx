@@ -1,8 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CATEGORIES, MOCK_STREAMS } from '../lib/data'
 import { VideoCard } from '../components/VideoCard'
 import { Plus, Loader2, Radio } from 'lucide-react'
 import type { FeedItem } from '../../../shared/types'
+
+const CATEGORIES = [
+  'All',
+  'Live Now',
+  'Premier League',
+  'Champions League',
+  'Formula 1',
+  'NBA',
+  'NFL',
+  'UFC',
+  'Highlights'
+]
 
 export function Home() {
   const [activeCategory, setActiveCategory] = useState('All')
@@ -36,19 +47,16 @@ export function Home() {
       if (msg.type === 'feed-data') {
         setFeedItems(msg.items || [])
         setLoading(false)
+      } else if (msg.type === 'error' && msg.command === 'get-feed') {
+        console.error('Failed to get feed:', msg.message)
+        setLoading(false)
       }
     }
 
     window.qvacAPI.onP2PMessage(handleMessage)
     window.qvacAPI.getFeed()
 
-    // Timeout fallback - show mock data if no response in 5s
-    const timeout = setTimeout(() => {
-      setLoading(false)
-    }, 5000)
-
     return () => {
-      clearTimeout(timeout)
       window.qvacAPI.removeP2PMessageListener()
     }
   }, [])
@@ -74,8 +82,7 @@ export function Home() {
     }
   }
 
-  // Use live feed if available, otherwise fall back to mock data
-  const displayStreams = feedStreams.length > 0 ? feedStreams : MOCK_STREAMS
+  const displayStreams = feedStreams
 
   return (
     <div className="max-w-[2400px] mx-auto pb-10">

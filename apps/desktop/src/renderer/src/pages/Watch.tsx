@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ThumbsUp, ThumbsDown, Share2, MoreHorizontal, PlayCircle, Loader2, Wifi, Download, CheckCircle2 } from 'lucide-react'
-import { MOCK_STREAMS } from '../lib/data'
+import { ThumbsUp, ThumbsDown, Share2, MoreHorizontal, Loader2, Wifi, Download, CheckCircle2 } from 'lucide-react'
 import { ChatInterface } from '../components/ChatInterface'
 
 type ConnectionState = 'connecting' | 'buffering' | 'streaming' | 'error'
@@ -25,13 +24,9 @@ export function Watch({
   const [downloadProgress, setDownloadProgress] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Parse compound ID (channelKey:videoId) or fall back to mock
-  const isP2PId = id?.includes(':')
-  const channelKey = isP2PId ? id!.split(':')[0] : null
-  const videoId = isP2PId ? id!.split(':')[1] : null
-
-  // Fall back to mock data for non-P2P IDs
-  const activeVideo = !isP2PId ? MOCK_STREAMS.find((v) => v.id === id) : null
+  // Parse compound ID (channelKey:videoId)
+  const channelKey = id?.includes(':') ? id!.split(':')[0] : null
+  const videoId = id?.includes(':') ? id!.split(':')[1] : null
 
   useEffect(() => {
     if (!channelKey || !videoId) return
@@ -92,8 +87,8 @@ export function Watch({
     }
   }
 
-  const displayTitle = activeVideo?.title || (channelKey ? `Stream from ${channelKey.slice(0, 8)}...` : 'Unknown Stream')
-  const displayChannel = activeVideo?.channel || (channelKey ? `Channel ${channelKey.slice(0, 12)}...` : 'Unknown')
+  const displayTitle = channelKey ? `Stream from ${channelKey.slice(0, 8)}...` : 'Unknown Stream'
+  const displayChannel = channelKey ? `Channel ${channelKey.slice(0, 12)}...` : 'Unknown'
 
   return (
     <div className="mx-auto max-w-[1800px] p-4 lg:p-6 flex flex-col lg:flex-row gap-6">
@@ -112,25 +107,6 @@ export function Watch({
               onPlaying={() => setConnectionState('streaming')}
               onError={() => setConnectionState('error')}
             />
-          ) : activeVideo ? (
-            <>
-              <img
-                src={activeVideo.thumbnail}
-                alt={activeVideo.title}
-                className="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm"
-              />
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60">
-                <div className="h-14 w-14 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
-                <div className="text-center">
-                  <h3 className="text-sm font-medium text-neutral-200">
-                    Connecting to {activeVideo.channel}...
-                  </h3>
-                  <p className="text-xs text-neutral-500 mt-1 font-mono">
-                    Channel ID: {activeVideo.id}
-                  </p>
-                </div>
-              </div>
-            </>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80">
               {connectionState === 'connecting' && (
@@ -152,16 +128,6 @@ export function Watch({
                   <p className="text-xs text-neutral-500">The channel may be offline or the video unavailable.</p>
                 </>
               )}
-            </div>
-          )}
-
-          {/* Overlay controls for mock videos */}
-          {activeVideo && !streamUrl && (
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-4">
-              <PlayCircle className="h-8 w-8 hover:text-indigo-400 cursor-pointer transition-colors" />
-              <div className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden cursor-pointer">
-                <div className="h-full bg-indigo-500 w-1/3" />
-              </div>
             </div>
           )}
 
@@ -189,20 +155,10 @@ export function Watch({
           </h1>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              {activeVideo?.avatar ? (
-                <img
-                  src={activeVideo.avatar}
-                  className="h-10 w-10 rounded-full border border-neutral-700 object-cover"
-                />
-              ) : (
-                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-sm font-bold">
-                  {displayChannel.charAt(0)}
-                </div>
-              )}
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-[#F1F1F1]">{displayChannel}</span>
                 <span className="text-xs text-[#AAAAAA]">
-                  {activeVideo?.viewers || '0'} Viewers
+                  0 Viewers
                 </span>
               </div>
               <button
@@ -233,7 +189,7 @@ export function Watch({
               </button>
 
               {/* Download & Seed — only for real P2P streams */}
-              {isP2PId && (
+              {channelKey && videoId && (
                 <button
                   onClick={handleDownloadAndSeed}
                   disabled={downloadState !== 'idle'}
@@ -277,9 +233,7 @@ export function Watch({
           <div className="font-medium mb-1">
             {streamUrl
               ? 'Streaming • Bolt Network Protocol (P2P)'
-              : activeVideo?.isLive
-                ? 'Live • Streamed over Bolt Network Protocol'
-                : `${activeVideo?.time || 'Just now'} • Bolt Network Protocol`}
+              : 'Connecting... • Bolt Network Protocol'}
           </div>
           <p className="line-clamp-2 text-[#AAAAAA]">
             This stream is hosted purely peer-to-peer via Bare runtime and Corestore. By watching,

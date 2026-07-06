@@ -1,6 +1,17 @@
 import { Radio } from 'lucide-react'
-import { Stream } from '../lib/data'
 import { useNavigate } from 'react-router-dom'
+
+export interface Stream {
+  id: string
+  title: string
+  channel: string
+  viewers: string
+  isLive: boolean
+  thumbnail: string
+  avatar: string
+  time?: string
+  duration?: string
+}
 
 export function VideoCard({ stream }: { stream: Stream }) {
   const navigate = useNavigate()
