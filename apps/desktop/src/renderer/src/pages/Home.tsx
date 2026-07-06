@@ -30,7 +30,7 @@ export function Home() {
     channel: item.channelName,
     viewers: '0',
     isLive: item.video.isLive,
-    thumbnail: '',
+    thumbnail: item.video.thumbnailPath || '',
     avatar: item.channelAvatar || '',
     time: new Date(item.video.timestamp).toLocaleDateString(),
     duration: item.video.duration,
