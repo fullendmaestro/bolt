@@ -94,11 +94,10 @@ export function Home() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`whitespace-nowrap px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  activeCategory === cat
-                    ? 'bg-white text-black'
-                    : 'bg-white/10 text-white hover:bg-white/20'
-                }`}
+                className={`whitespace-nowrap px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeCategory === cat
+                  ? 'bg-white text-black'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
               >
                 {cat}
               </button>
