@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "schema": [
     {
       "id": 0,
@@ -162,6 +162,19 @@
         "send": true
       },
       "version": 1
+    },
+    {
+      "id": 2,
+      "name": "@bolt/initWorker",
+      "request": {
+        "name": "@bolt/init-worker-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/init-worker-response",
+        "stream": false
+      },
+      "version": 2
     }
   ]
 }

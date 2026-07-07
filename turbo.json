@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "dev:pear1": {
+      "persistent": true,
+      "cache": false
+    },
+    "dev:pear2": {
+      "persistent": true,
+      "cache": false
+    },
+    "dev:pear3": {
+      "persistent": true,
+      "cache": false
+    }
+  }
+}

@@ -33,7 +33,9 @@ const methods = new Map([
   ['@bolt/downloadProgress', 12],
   [12, '@bolt/downloadProgress'],
   ['@bolt/errorEvent', 13],
-  [13, '@bolt/errorEvent']
+  [13, '@bolt/errorEvent'],
+  ['@bolt/initWorker', 14],
+  [14, '@bolt/initWorker']
 ])
 
 class HRPC {
@@ -54,7 +56,8 @@ class HRPC {
       ['@bolt/channelEvent', getEncoding('@bolt/channel-event')],
       ['@bolt/uploadProgress', getEncoding('@bolt/upload-progress')],
       ['@bolt/downloadProgress', getEncoding('@bolt/download-progress')],
-      ['@bolt/errorEvent', getEncoding('@bolt/error-event')]
+      ['@bolt/errorEvent', getEncoding('@bolt/error-event')],
+      ['@bolt/initWorker', getEncoding('@bolt/init-worker-request')]
     ])
     this._responseEncodings = new Map([
       ['@bolt/joinChannel', getEncoding('@bolt/channel-response')],
@@ -65,7 +68,8 @@ class HRPC {
       ['@bolt/getUploads', getEncoding('@bolt/get-uploads-response')],
       ['@bolt/startStream', getEncoding('@bolt/start-stream-response')],
       ['@bolt/injectEvent', getEncoding('@bolt/success-response')],
-      ['@bolt/downloadVideo', getEncoding('@bolt/download-video-response')]
+      ['@bolt/downloadVideo', getEncoding('@bolt/download-video-response')],
+      ['@bolt/initWorker', getEncoding('@bolt/init-worker-response')]
     ])
     this._rpc = new RPC(stream, async (req) => {
       const command = methods.get(req.command)
@@ -219,6 +223,10 @@ class HRPC {
     return this._callSync('@bolt/errorEvent', args)
   }
 
+  async initWorker(args) {
+    return this._call('@bolt/initWorker', args)
+  }
+
   onJoinChannel(responseFn) {
     this._handlers['@bolt/joinChannel'] = responseFn
   }
@@ -273,6 +281,10 @@ class HRPC {
 
   onErrorEvent(responseFn) {
     this._handlers['@bolt/errorEvent'] = responseFn
+  }
+
+  onInitWorker(responseFn) {
+    this._handlers['@bolt/initWorker'] = responseFn
   }
 
   _requestIsStream(command) {

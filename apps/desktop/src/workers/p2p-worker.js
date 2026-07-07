@@ -36,7 +36,7 @@ const pear = new PearRuntime({ ...updaterConfig, swarm, store })
 let blobServer = null
 let STREAM_PORT = 0
 const channels = new Map() // channelKey (hex) -> { baseCore, autobase, blobsCore, blobs, metadata, videos, events }
-let ownChannelKey = null
+const ownedChannels = new Set()
 
 // ── Blind Peering ──
 // For testing, we connect to a local blind-peer-cli if it exists.
@@ -76,14 +76,18 @@ function getMimeType(filePath) {
 
 // ── RPC Handlers ──
 
-rpc.onInitChannel(async (req) => {
-  if (channels.has(ownChannelKey)) {
-    return { publicKey: ownChannelKey, name: channels.get(ownChannelKey).metadata.name }
+rpc.onInitWorker(async (req) => {
+  if (req.ownedChannels) {
+    req.ownedChannels.forEach(k => ownedChannels.add(k))
   }
+  return { success: true }
+})
 
-  const baseCore = store.get({ name: 'channel-base' })
+rpc.onInitChannel(async (req) => {
+  const channelNs = crypto.randomBytes(32)
+  const baseCore = store.namespace(channelNs).get({ name: 'channel-base' })
   await baseCore.ready()
-  const blobsCore = store.get({ name: 'channel-blobs' })
+  const blobsCore = store.namespace(channelNs).get({ name: 'channel-blobs' })
   await blobsCore.ready()
 
   const autobase = new Autobase(store, baseCore.key, { 
@@ -99,15 +103,34 @@ rpc.onInitChannel(async (req) => {
 
   const blobs = new Hyperblobs(blobsCore)
 
-  ownChannelKey = b4a.toString(baseCore.key, 'hex')
+  const ownChannelKey = b4a.toString(baseCore.key, 'hex')
   const blobsKeyHex = b4a.toString(blobsCore.key, 'hex')
+  ownedChannels.add(ownChannelKey)
+
+  let avatarBlob = null
+  let avatarExt = ''
+  if (req.avatarPath) {
+    try {
+      const rs = fs.createReadStream(req.avatarPath)
+      const ws = blobs.createWriteStream()
+      await new Promise((resolve, reject) => {
+        ws.on('error', reject)
+        ws.on('close', resolve)
+        rs.pipe(ws)
+      })
+      avatarBlob = { key: blobsKeyHex, ...ws.id }
+      avatarExt = path.extname(req.avatarPath)
+    } catch (err) {
+      console.error('Failed to upload avatar:', err)
+    }
+  }
 
   const channelData = {
     baseCore,
     autobase,
     blobsCore,
     blobs,
-    metadata: { name: req.name, description: req.description, avatarPath: req.avatarPath, blobsKey: blobsKeyHex },
+    metadata: { name: req.name, description: req.description, avatarBlob, avatarExt, blobsKey: blobsKeyHex },
     videos: [],
     events: []
   }
@@ -118,7 +141,8 @@ rpc.onInitChannel(async (req) => {
     type: 'init',
     name: req.name,
     description: req.description,
-    avatarPath: req.avatarPath,
+    avatarBlob,
+    avatarExt,
     blobsKey: blobsKeyHex
   })
 
@@ -183,8 +207,10 @@ async function processAutobaseNode(channelKey, channelData, msg) {
   if (msg.type === 'init') {
     channelData.metadata.name = msg.name
     channelData.metadata.description = msg.description
-    channelData.metadata.avatarPath = msg.avatarPath
+    channelData.metadata.avatarBlob = msg.avatarBlob
+    channelData.metadata.avatarExt = msg.avatarExt
     channelData.metadata.blobsKey = msg.blobsKey
+    channelData.metadata.avatarPath = msg.avatarPath || '' // Legacy fallback
     
     if (!channelData.blobsCore) {
       const blobsCore = store.get({ key: b4a.from(msg.blobsKey, 'hex') })
@@ -205,7 +231,7 @@ async function processAutobaseNode(channelKey, channelData, msg) {
 
 rpc.onLeaveChannel(async (req) => {
   const { channelKey } = req
-  if (channels.has(channelKey) && channelKey !== ownChannelKey) {
+  if (channels.has(channelKey) && !ownedChannels.has(channelKey)) {
     channels.delete(channelKey)
   }
   return { channelKey }
@@ -217,13 +243,24 @@ rpc.onGetFeed(async () => {
     if (!channel.metadata.name || channel.metadata.name === 'Loading...') continue
 
     const channelName = channel.metadata.name
-    const channelAvatar = '' // Simplified for this rewrite
+    
+    // Support legacy avatarPath
+    let channelAvatar = channel.metadata.avatarPath || ''
+    if (channel.blobsCore && channel.metadata.avatarBlob) {
+      channelAvatar = blobServer.getLink(channel.blobsCore.key, { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
+    }
 
     for (const video of channel.videos) {
+      // Support legacy thumbnailPath
+      let thumbnailPath = video.thumbnailPath || ''
+      if (channel.blobsCore && video.thumbnailBlob) {
+        thumbnailPath = blobServer.getLink(channel.blobsCore.key, { blob: video.thumbnailBlob, type: getMimeType('dummy' + video.thumbnailExt) })
+      }
+
       items.push({
         video: {
           ...video,
-          thumbnailPath: '' // Simplified
+          thumbnailPath
         },
         channelKey,
         channelName,
@@ -237,28 +274,44 @@ rpc.onGetFeed(async () => {
 })
 
 rpc.onGetUploads(async () => {
-  if (!ownChannelKey || !channels.has(ownChannelKey)) {
+  const activeChannelKey = Array.from(ownedChannels).pop()
+  if (!activeChannelKey || !channels.has(activeChannelKey)) {
     return { channelJson: JSON.stringify(null) }
   }
 
-  const channel = channels.get(ownChannelKey)
+  const channel = channels.get(activeChannelKey)
+  let avatar = channel.metadata.avatarPath || ''
+  if (channel.blobsCore && channel.metadata.avatarBlob) {
+    avatar = blobServer.getLink(channel.blobsCore.key, { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
+  }
+
+  const videos = channel.videos.map(v => {
+    let thumbnailPath = v.thumbnailPath || ''
+    if (channel.blobsCore && v.thumbnailBlob) {
+      thumbnailPath = blobServer.getLink(channel.blobsCore.key, { blob: v.thumbnailBlob, type: getMimeType('dummy' + v.thumbnailExt) })
+    }
+    return { ...v, thumbnailPath }
+  })
+
   const channelData = {
-    publicKey: ownChannelKey,
+    publicKey: activeChannelKey,
     name: channel.metadata.name,
     description: channel.metadata.description,
-    avatar: '',
-    videos: channel.videos
+    avatar,
+    videos
   }
 
   return { channelJson: JSON.stringify(channelData) }
 })
 
 rpc.onUploadVideo(async (req) => {
-  if (!ownChannelKey) {
+  const activeChannelKey = req.channelKey || Array.from(ownedChannels).pop()
+  if (!activeChannelKey) {
     throw new Error('Channel not initialized')
   }
   
-  const channel = channels.get(ownChannelKey)
+  const channel = channels.get(activeChannelKey)
+  if (!channel) throw new Error('Channel not found')
   const videoId = b4a.toString(crypto.randomBytes(8), 'hex')
 
   const rs = fs.createReadStream(req.filePath)
@@ -280,6 +333,24 @@ rpc.onUploadVideo(async (req) => {
 
   const blob = { key: channel.metadata.blobsKey, ...ws.id }
 
+  let thumbnailBlob = null
+  let thumbnailExt = ''
+  if (req.thumbnailPath) {
+    try {
+      const rsThumb = fs.createReadStream(req.thumbnailPath)
+      const wsThumb = channel.blobs.createWriteStream()
+      await new Promise((resolve, reject) => {
+        wsThumb.on('error', reject)
+        wsThumb.on('close', resolve)
+        rsThumb.pipe(wsThumb)
+      })
+      thumbnailBlob = { key: channel.metadata.blobsKey, ...wsThumb.id }
+      thumbnailExt = path.extname(req.thumbnailPath)
+    } catch (err) {
+      console.error('Failed to upload thumbnail:', err)
+    }
+  }
+
   const videoEntry = {
     id: videoId,
     title: req.title,
@@ -288,6 +359,8 @@ rpc.onUploadVideo(async (req) => {
     duration: req.duration,
     filename: path.basename(req.filePath),
     blob,
+    thumbnailBlob,
+    thumbnailExt,
     isLive: false
   }
 
@@ -315,8 +388,11 @@ rpc.onStartStream(async (req) => {
 })
 
 rpc.onInjectEvent(async (req) => {
-  if (!ownChannelKey) throw new Error('Channel not initialized')
-  const channel = channels.get(ownChannelKey)
+  const activeChannelKey = req.channelKey || Array.from(ownedChannels).pop()
+  if (!activeChannelKey) throw new Error('Channel not initialized')
+  
+  const channel = channels.get(activeChannelKey)
+  if (!channel) throw new Error('Channel not found')
   
   const eventData = JSON.parse(req.eventJson)
   await channel.autobase.append({

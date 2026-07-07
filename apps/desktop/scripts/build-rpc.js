@@ -24,6 +24,20 @@ schemaNs.register({
   fields: []
 })
 schemaNs.register({
+  name: 'init-worker-request',
+  fields: [
+    { name: 'ownedChannels', type: 'string', array: true }
+  ]
+})
+
+schemaNs.register({
+  name: 'init-worker-response',
+  fields: [
+    { name: 'success', type: 'bool' }
+  ]
+})
+
+schemaNs.register({
   name: 'get-feed-response',
   fields: [{ name: 'itemsJson', type: 'string' }]
 })
@@ -50,7 +64,8 @@ schemaNs.register({
     { name: 'filePath', type: 'string' },
     { name: 'title', type: 'string' },
     { name: 'duration', type: 'string' },
-    { name: 'thumbnailPath', type: 'string' }
+    { name: 'thumbnailPath', type: 'string' },
+    { name: 'channelKey', type: 'string' }
   ]
 })
 schemaNs.register({
@@ -147,6 +162,11 @@ ns.register({
   name: 'leaveChannel',
   request: { name: '@bolt/join-channel-request', stream: false },
   response: { name: '@bolt/channel-response', stream: false }
+})
+ns.register({
+  name: 'initWorker',
+  request: { name: '@bolt/init-worker-request', stream: false },
+  response: { name: '@bolt/init-worker-response', stream: false }
 })
 ns.register({
   name: 'getFeed',

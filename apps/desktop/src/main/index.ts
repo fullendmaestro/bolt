@@ -38,12 +38,14 @@ if (userDataArg) {
 interface StoreSchema {
   joinedChannels: string[]
   ownChannelKey: string | null
+  ownedChannels: string[]
 }
 
 const localStore = new Store<StoreSchema>({
   defaults: {
     joinedChannels: [],
-    ownChannelKey: null
+    ownChannelKey: null,
+    ownedChannels: []
   }
 })
 
@@ -89,13 +91,17 @@ function initP2PWorker(): void {
 
   rpc.onWorkerReady(() => {
     console.log('P2P Worker is ready')
+    const ownedChannels = localStore.get('ownedChannels', [])
+    rpc.initWorker({ ownedChannels }).catch(console.error)
+
     const savedChannels = localStore.get('joinedChannels', [])
     for (const key of savedChannels) {
       rpc.joinChannel({ channelKey: key }).catch(console.error)
     }
     const ownKey = localStore.get('ownChannelKey', null)
-    if (ownKey) {
-      rpc.joinChannel({ channelKey: ownKey }).catch(console.error)
+    if (ownKey && !ownedChannels.includes(ownKey)) {
+      ownedChannels.push(ownKey)
+      localStore.set('ownedChannels', ownedChannels)
     }
   })
 
@@ -180,8 +186,19 @@ function setupHandlers(): void {
   })
 
   ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
-    const res = await rpc.initChannel({ name, description, avatarPath: avatarPath || '' })
-    win?.webContents.send('p2p-worker-message', { type: 'channel-initialized', publicKey: res.publicKey, name: res.name })
+    try {
+      const res = await rpc.initChannel({ name, description, avatarPath: avatarPath || '' })
+      const ownedChannels = localStore.get('ownedChannels', []) as string[]
+      if (!ownedChannels.includes(res.publicKey)) {
+        ownedChannels.push(res.publicKey)
+        localStore.set('ownedChannels', ownedChannels)
+      }
+      win?.webContents.send('p2p-worker-message', { type: 'channel-initialized', publicKey: res.publicKey, name: res.name })
+      return res.publicKey
+    } catch (err: any) {
+      console.error('Channel init failed:', err)
+      throw err
+    }
   })
 
   // ── Avatar / Thumbnail Selectors ──────────────────────
@@ -223,11 +240,15 @@ function setupHandlers(): void {
     }
 
     const filePath = result.filePaths[0]
+    const ownedChannels = localStore.get('ownedChannels', [])
+    const activeChannel = ownedChannels.length > 0 ? ownedChannels[ownedChannels.length - 1] : ''
+
     rpc.uploadVideo({
       filePath,
       title: title || 'Untitled Upload',
       duration: '0:00',
-      thumbnailPath: thumbnailPath || ''
+      thumbnailPath: thumbnailPath || '',
+      channelKey: activeChannel
     }).then((res) => {
       win?.webContents.send('p2p-worker-message', { type: 'upload-complete', video: JSON.parse(res.videoJson) })
     }).catch((err) => {
@@ -268,7 +289,9 @@ function setupHandlers(): void {
 
   // ── Event Injection Handler ───────────────────────────
   ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'>) => {
-    await rpc.injectEvent({ eventJson: JSON.stringify(eventData) })
+    const ownedChannels = localStore.get('ownedChannels', [])
+    const activeChannel = ownedChannels.length > 0 ? ownedChannels[ownedChannels.length - 1] : ''
+    await rpc.injectEvent({ channelKey: activeChannel, eventJson: JSON.stringify(eventData) })
   })
 
   // ── Legacy P2P Send (backward compatibility) ──────────
