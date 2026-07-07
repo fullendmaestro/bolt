@@ -1,0 +1,331 @@
+{
+  "version": 1,
+  "schema": [
+    {
+      "name": "join-channel-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "channelKey",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "channel-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "channelKey",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "empty-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": -1,
+      "fields": []
+    },
+    {
+      "name": "get-feed-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "itemsJson",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "init-channel-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "avatarPath",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "init-channel-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "publicKey",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "upload-video-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "duration",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "thumbnailPath",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "upload-video-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "videoJson",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "get-uploads-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "channelJson",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "start-stream-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "channelKey",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "videoId",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "start-stream-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "url",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "channelKey",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "videoId",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "inject-event-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "eventJson",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "success-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "success",
+          "type": "bool",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "download-video-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "channelKey",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "videoId",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "destinationPath",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "download-video-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "destinationPath",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "channel-event",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "eventJson",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "upload-progress",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "videoId",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "percent",
+          "type": "uint",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "download-progress",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "videoId",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "channelKey",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "percent",
+          "type": "uint",
+          "version": 1
+        },
+        {
+          "name": "bytesReceived",
+          "type": "uint",
+          "version": 1
+        },
+        {
+          "name": "totalBytes",
+          "type": "uint",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "error-event",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "message",
+          "type": "string",
+          "version": 1
+        },
+        {
+          "name": "command",
+          "type": "string",
+          "version": 1
+        }
+      ]
+    }
+  ]
+}

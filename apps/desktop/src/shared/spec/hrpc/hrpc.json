@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "schema": [
+    {
+      "id": 0,
+      "name": "@bolt/joinChannel",
+      "request": {
+        "name": "@bolt/join-channel-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/channel-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 1,
+      "name": "@bolt/leaveChannel",
+      "request": {
+        "name": "@bolt/join-channel-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/channel-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 2,
+      "name": "@bolt/getFeed",
+      "request": {
+        "name": "@bolt/empty-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/get-feed-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 3,
+      "name": "@bolt/initChannel",
+      "request": {
+        "name": "@bolt/init-channel-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/init-channel-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 4,
+      "name": "@bolt/uploadVideo",
+      "request": {
+        "name": "@bolt/upload-video-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/upload-video-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 5,
+      "name": "@bolt/getUploads",
+      "request": {
+        "name": "@bolt/empty-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/get-uploads-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 6,
+      "name": "@bolt/startStream",
+      "request": {
+        "name": "@bolt/start-stream-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/start-stream-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 7,
+      "name": "@bolt/injectEvent",
+      "request": {
+        "name": "@bolt/inject-event-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/success-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 8,
+      "name": "@bolt/downloadVideo",
+      "request": {
+        "name": "@bolt/download-video-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/download-video-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 9,
+      "name": "@bolt/workerReady",
+      "request": {
+        "name": "@bolt/empty-request",
+        "send": true
+      },
+      "version": 1
+    },
+    {
+      "id": 10,
+      "name": "@bolt/channelEvent",
+      "request": {
+        "name": "@bolt/channel-event",
+        "send": true
+      },
+      "version": 1
+    },
+    {
+      "id": 11,
+      "name": "@bolt/uploadProgress",
+      "request": {
+        "name": "@bolt/upload-progress",
+        "send": true
+      },
+      "version": 1
+    },
+    {
+      "id": 12,
+      "name": "@bolt/downloadProgress",
+      "request": {
+        "name": "@bolt/download-progress",
+        "send": true
+      },
+      "version": 1
+    },
+    {
+      "id": 13,
+      "name": "@bolt/errorEvent",
+      "request": {
+        "name": "@bolt/error-event",
+        "send": true
+      },
+      "version": 1
+    }
+  ]
+}

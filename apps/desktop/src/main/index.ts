@@ -10,17 +10,16 @@ import {
   completion
 } from '@qvac/sdk'
 import Store from 'electron-store'
-import type { P2PCommand, P2PResponse, ChannelEvent } from '../shared/types'
-
+import type { ChannelEvent } from '../shared/types'
 const PearRuntime = require('pear-runtime')
-const FramedStream = require('framed-stream')
+const HRPC = require('../shared/spec/hrpc/index.js')
 
 app.commandLine.appendSwitch('no-sandbox')
 
 // ── State ──────────────────────────────────────────────────
 let win: BrowserWindow | null = null
 let modelId: string | null = null
-let workerPipe: any = null
+let rpc: any = null
 
 // --- Strict Instance Isolation ---
 // Parse custom user data directory for multi-peer local testing
@@ -71,44 +70,6 @@ function createWindow(): void {
 }
 
 // ── P2P Worker Management ──────────────────────────────────
-function sendToWorker(command: P2PCommand): void {
-  if (workerPipe) {
-    workerPipe.write(JSON.stringify(command))
-  } else {
-    console.warn('Worker pipe not initialized, cannot send:', command.type)
-  }
-}
-
-function handleWorkerMessage(message: P2PResponse): void {
-  if (!win || win.isDestroyed()) return
-
-  switch (message.type) {
-    case 'worker-ready':
-      console.log('P2P Worker is ready')
-      // Rejoin all saved channels
-      const savedChannels = localStore.get('joinedChannels', [])
-      for (const key of savedChannels) {
-        sendToWorker({ type: 'join-channel', channelKey: key })
-      }
-      // Restore own channel if it exists
-      const ownKey = localStore.get('ownChannelKey', null)
-      if (ownKey) {
-        sendToWorker({ type: 'join-channel', channelKey: ownKey })
-      }
-      break
-
-    case 'channel-event':
-      // Route channel events to the renderer for AI context injection
-      win.webContents.send('channel-event', message.event)
-      break
-
-    default:
-      // Forward all other messages to the renderer
-      win.webContents.send('p2p-worker-message', message)
-      break
-  }
-}
-
 function initP2PWorker(): void {
   const appName = 'BoltSports'
   // Use the isolated app.getPath('userData') so corestore stays separated!
@@ -124,19 +85,38 @@ function initP2PWorker(): void {
     appName
   ])
 
-  workerPipe = new FramedStream(worker)
+  rpc = new HRPC(worker)
 
-  workerPipe.on('error', (err) => {
-    console.error('Worker pipe error:', err)
+  rpc.onWorkerReady(() => {
+    console.log('P2P Worker is ready')
+    const savedChannels = localStore.get('joinedChannels', [])
+    for (const key of savedChannels) {
+      rpc.joinChannel({ channelKey: key }).catch(console.error)
+    }
+    const ownKey = localStore.get('ownChannelKey', null)
+    if (ownKey) {
+      rpc.joinChannel({ channelKey: ownKey }).catch(console.error)
+    }
   })
 
-  workerPipe.on('data', (data: Buffer) => {
-    try {
-      const message = JSON.parse(data.toString())
-      handleWorkerMessage(message)
-    } catch (err) {
-      console.error('Failed to parse worker message:', err)
-    }
+  rpc.onChannelEvent(({ eventJson }) => {
+    win?.webContents.send('channel-event', JSON.parse(eventJson))
+  })
+
+  rpc.onErrorEvent(({ message, command }) => {
+    win?.webContents.send('p2p-worker-message', { type: 'error', message, command })
+  })
+
+  rpc.onUploadProgress(({ videoId, percent }) => {
+    win?.webContents.send('p2p-worker-message', { type: 'upload-progress', videoId, percent })
+  })
+
+  rpc.onDownloadProgress(({ videoId, channelKey, percent, bytesReceived, totalBytes }) => {
+    win?.webContents.send('p2p-worker-message', { type: 'download-progress', videoId, channelKey, percent, bytesReceived, totalBytes })
+  })
+
+  worker.on('error', (err: Error) => {
+    console.error('Worker pipe error:', err)
   })
 
   worker.stderr.on('data', (err: Buffer) => {
@@ -183,7 +163,7 @@ function setupHandlers(): void {
       channels.push(channelKey)
       localStore.set('joinedChannels', channels)
     }
-    sendToWorker({ type: 'join-channel', channelKey })
+    await rpc.joinChannel({ channelKey })
   })
 
   ipcMain.handle('channel:leave', async (_event, channelKey: string) => {
@@ -192,7 +172,7 @@ function setupHandlers(): void {
       'joinedChannels',
       channels.filter((k) => k !== channelKey)
     )
-    sendToWorker({ type: 'leave-channel', channelKey })
+    await rpc.leaveChannel({ channelKey })
   })
 
   ipcMain.handle('channel:list', async () => {
@@ -200,7 +180,8 @@ function setupHandlers(): void {
   })
 
   ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
-    sendToWorker({ type: 'init-channel', name, description, avatarPath })
+    const res = await rpc.initChannel({ name, description, avatarPath: avatarPath || '' })
+    win?.webContents.send('p2p-worker-message', { type: 'channel-initialized', publicKey: res.publicKey, name: res.name })
   })
 
   // ── Avatar / Thumbnail Selectors ──────────────────────
@@ -226,7 +207,8 @@ function setupHandlers(): void {
 
   // ── Feed Handler ──────────────────────────────────────
   ipcMain.handle('feed:get', async () => {
-    sendToWorker({ type: 'get-feed' })
+    const res = await rpc.getFeed({})
+    win?.webContents.send('p2p-worker-message', { type: 'feed-data', items: JSON.parse(res.itemsJson) })
   })
 
   // ── Upload Handlers ───────────────────────────────────
@@ -241,23 +223,28 @@ function setupHandlers(): void {
     }
 
     const filePath = result.filePaths[0]
-    sendToWorker({
-      type: 'upload-video',
+    rpc.uploadVideo({
       filePath,
       title: title || 'Untitled Upload',
       duration: '0:00',
-      thumbnailPath
+      thumbnailPath: thumbnailPath || ''
+    }).then((res) => {
+      win?.webContents.send('p2p-worker-message', { type: 'upload-complete', video: JSON.parse(res.videoJson) })
+    }).catch((err) => {
+      win?.webContents.send('p2p-worker-message', { type: 'error', message: err.message, command: 'upload-video' })
     })
     return { canceled: false, filePath }
   })
 
   ipcMain.handle('uploads:get', async () => {
-    sendToWorker({ type: 'get-uploads' })
+    const res = await rpc.getUploads({})
+    win?.webContents.send('p2p-worker-message', { type: 'uploads-data', channel: JSON.parse(res.channelJson) })
   })
 
   // ── Streaming Handler ─────────────────────────────────
   ipcMain.handle('stream:start', async (_event, channelKey: string, videoId: string) => {
-    sendToWorker({ type: 'start-stream', channelKey, videoId })
+    const res = await rpc.startStream({ channelKey, videoId })
+    win?.webContents.send('p2p-worker-message', { type: 'stream-url', url: res.url, channelKey: res.channelKey, videoId: res.videoId })
   })
 
   // ── Download & Seed Handler ───────────────────────────
@@ -268,22 +255,25 @@ function setupHandlers(): void {
       filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
     })
     if (result.canceled || !result.filePath) return { canceled: true }
-    sendToWorker({ type: 'download-video', channelKey, videoId, destinationPath: result.filePath })
+    
+    rpc.downloadVideo({ channelKey, videoId, destinationPath: result.filePath })
+      .then((res) => {
+        win?.webContents.send('p2p-worker-message', { type: 'download-complete', videoId, channelKey, destinationPath: res.destinationPath })
+      })
+      .catch((err) => {
+        win?.webContents.send('p2p-worker-message', { type: 'error', message: err.message, command: 'download-video' })
+      })
     return { canceled: false, destinationPath: result.filePath }
   })
 
   // ── Event Injection Handler ───────────────────────────
   ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'>) => {
-    sendToWorker({ type: 'inject-event', event: eventData })
+    await rpc.injectEvent({ eventJson: JSON.stringify(eventData) })
   })
 
   // ── Legacy P2P Send (backward compatibility) ──────────
   ipcMain.handle('p2p-send', async (_event, payload) => {
-    if (workerPipe) {
-      workerPipe.write(JSON.stringify(payload))
-    } else {
-      console.warn('Attempted to send P2P command, but worker pipe is not initialized.')
-    }
+    console.warn('Legacy p2p-send called, payload ignored:', payload)
   })
 }
 
