@@ -392,7 +392,12 @@ rpc.onUploadVideo(async (req) => {
 
   rs.on('data', chunk => {
     uploadedBytes += chunk.length
-    rpc.uploadProgress({ videoId, percent: Math.round((uploadedBytes / totalBytes) * 100) })
+    rpc.uploadProgress({ 
+      videoId, 
+      percent: Math.round((uploadedBytes / totalBytes) * 100),
+      bytesReceived: uploadedBytes,
+      totalBytes
+    })
   })
 
   await new Promise((resolve, reject) => {
