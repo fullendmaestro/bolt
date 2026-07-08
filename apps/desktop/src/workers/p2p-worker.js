@@ -71,7 +71,7 @@ setInterval(() => {
 
 // ── HTTP Blob Server ──
 async function startBlobServer() {
-  blobServer = new BlobServer(store.session())
+  blobServer = new BlobServer(store.session(), { sandbox: false })
   await blobServer.listen(0, '127.0.0.1')
   STREAM_PORT = blobServer.port
   console.log('[Bolt Worker] Blob Server listening on port', STREAM_PORT)
@@ -294,9 +294,6 @@ rpc.onGetFeed(async () => {
         blob: channel.metadata.avatarBlob, 
         type: getMimeType('dummy' + channel.metadata.avatarExt) 
       })
-      console.error('[Worker Debug] channelAvatar link:', channelAvatar)
-    } else {
-      console.error('[Worker Debug] channelAvatar fallback to avatarPath:', channelAvatar)
     }
 
     // 2. Format all Videos in the channel
@@ -307,9 +304,6 @@ rpc.onGetFeed(async () => {
           blob: v.thumbnailBlob, 
           type: getMimeType('dummy' + v.thumbnailExt) 
         })
-        console.error('[Worker Debug] video thumbnail link:', thumbnailPath)
-      } else {
-        console.error('[Worker Debug] video thumbnail fallback to thumbnailPath:', thumbnailPath)
       }
       
       const safeVideo = { ...v }
