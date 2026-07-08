@@ -27,7 +27,7 @@ const updaterConfig = {
   name: Bare.argv[7]
 }
 
-const store = new Corestore(Bare.argv)
+const store = new Corestore(updaterConfig.dir)
 const swarm = new Hyperswarm()
 const pear = new PearRuntime({ ...updaterConfig, swarm, store })
 
@@ -360,7 +360,10 @@ rpc.onGetUploads(async (req) => {
     if (channel.blobsCore && v.thumbnailBlob) {
       thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: v.thumbnailBlob, type: getMimeType('dummy' + v.thumbnailExt) })
     }
-    return { ...v, thumbnailPath }
+    const safeVideo = { ...v }
+    delete safeVideo.blob
+    delete safeVideo.thumbnailBlob
+    return { ...safeVideo, thumbnailPath }
   })
 
   const channelData = {
