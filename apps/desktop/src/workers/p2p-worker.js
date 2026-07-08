@@ -27,8 +27,7 @@ const updaterConfig = {
   name: Bare.argv[7]
 }
 
-const storePath = path.join(updaterConfig.dir, 'bolt-runtime/corestore')
-const store = new Corestore(storePath)
+const store = new Corestore(Bare.argv)
 const swarm = new Hyperswarm()
 const pear = new PearRuntime({ ...updaterConfig, swarm, store })
 
@@ -49,6 +48,26 @@ const blinds = new BlindPeering(swarm, blindPeers)
 swarm.on('connection', (connection) => {
   store.replicate(connection)
 })
+
+// ── App Lifecycle ──
+Bare.on('suspend', async () => {
+  await swarm.suspend()
+  pipe.unref()
+})
+
+Bare.on('resume', async () => {
+  await swarm.resume()
+  pipe.ref()
+})
+
+// ── Swarm Stats Interval ──
+setInterval(() => {
+  if (rpc && rpc.channelEvent) {
+    try {
+      rpc.channelEvent({ eventJson: JSON.stringify({ type: 'swarm-stats', count: swarm.connections.size }) })
+    } catch (e) {}
+  }
+}, 2000)
 
 // ── HTTP Blob Server ──
 async function startBlobServer() {
@@ -253,6 +272,7 @@ rpc.onLeaveChannel(async (req) => {
     const channel = channels.get(channelKey)
     if (channel.baseCore) await swarm.leave(channel.baseCore.discoveryKey)
     if (channel.blobsCore) await swarm.leave(channel.blobsCore.discoveryKey)
+    await swarm.flush()
     channels.delete(channelKey)
   }
   return { channelKey }
@@ -278,9 +298,13 @@ rpc.onGetFeed(async () => {
         thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: video.thumbnailBlob, type: getMimeType('dummy' + video.thumbnailExt) })
       }
 
+      const safeVideo = { ...video }
+      delete safeVideo.blob
+      delete safeVideo.thumbnailBlob
+
       items.push({
         video: {
-          ...video,
+          ...safeVideo,
           thumbnailPath
         },
         channelKey,
