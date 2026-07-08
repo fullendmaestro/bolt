@@ -294,6 +294,9 @@ rpc.onGetFeed(async () => {
         blob: channel.metadata.avatarBlob, 
         type: getMimeType('dummy' + channel.metadata.avatarExt) 
       })
+      console.error('[Worker Debug] channelAvatar link:', channelAvatar)
+    } else {
+      console.error('[Worker Debug] channelAvatar fallback to avatarPath:', channelAvatar)
     }
 
     // 2. Format all Videos in the channel
@@ -304,6 +307,9 @@ rpc.onGetFeed(async () => {
           blob: v.thumbnailBlob, 
           type: getMimeType('dummy' + v.thumbnailExt) 
         })
+        console.error('[Worker Debug] video thumbnail link:', thumbnailPath)
+      } else {
+        console.error('[Worker Debug] video thumbnail fallback to thumbnailPath:', thumbnailPath)
       }
       
       const safeVideo = { ...v }
