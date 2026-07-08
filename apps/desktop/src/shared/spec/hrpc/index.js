@@ -10,32 +10,34 @@ const methods = new Map([
   [0, '@bolt/joinChannel'],
   ['@bolt/leaveChannel', 1],
   [1, '@bolt/leaveChannel'],
-  ['@bolt/getFeed', 2],
-  [2, '@bolt/getFeed'],
-  ['@bolt/initChannel', 3],
-  [3, '@bolt/initChannel'],
-  ['@bolt/uploadVideo', 4],
-  [4, '@bolt/uploadVideo'],
-  ['@bolt/getUploads', 5],
-  [5, '@bolt/getUploads'],
-  ['@bolt/startStream', 6],
-  [6, '@bolt/startStream'],
-  ['@bolt/injectEvent', 7],
-  [7, '@bolt/injectEvent'],
-  ['@bolt/downloadVideo', 8],
-  [8, '@bolt/downloadVideo'],
-  ['@bolt/workerReady', 9],
-  [9, '@bolt/workerReady'],
-  ['@bolt/channelEvent', 10],
-  [10, '@bolt/channelEvent'],
-  ['@bolt/uploadProgress', 11],
-  [11, '@bolt/uploadProgress'],
-  ['@bolt/downloadProgress', 12],
-  [12, '@bolt/downloadProgress'],
-  ['@bolt/errorEvent', 13],
-  [13, '@bolt/errorEvent'],
-  ['@bolt/initWorker', 14],
-  [14, '@bolt/initWorker']
+  ['@bolt/initWorker', 2],
+  [2, '@bolt/initWorker'],
+  ['@bolt/getFeed', 3],
+  [3, '@bolt/getFeed'],
+  ['@bolt/initChannel', 4],
+  [4, '@bolt/initChannel'],
+  ['@bolt/uploadVideo', 5],
+  [5, '@bolt/uploadVideo'],
+  ['@bolt/getUploads', 6],
+  [6, '@bolt/getUploads'],
+  ['@bolt/getChannels', 7],
+  [7, '@bolt/getChannels'],
+  ['@bolt/startStream', 8],
+  [8, '@bolt/startStream'],
+  ['@bolt/injectEvent', 9],
+  [9, '@bolt/injectEvent'],
+  ['@bolt/downloadVideo', 10],
+  [10, '@bolt/downloadVideo'],
+  ['@bolt/workerReady', 11],
+  [11, '@bolt/workerReady'],
+  ['@bolt/channelEvent', 12],
+  [12, '@bolt/channelEvent'],
+  ['@bolt/uploadProgress', 13],
+  [13, '@bolt/uploadProgress'],
+  ['@bolt/downloadProgress', 14],
+  [14, '@bolt/downloadProgress'],
+  ['@bolt/errorEvent', 15],
+  [15, '@bolt/errorEvent']
 ])
 
 class HRPC {
@@ -45,10 +47,12 @@ class HRPC {
     this._requestEncodings = new Map([
       ['@bolt/joinChannel', getEncoding('@bolt/join-channel-request')],
       ['@bolt/leaveChannel', getEncoding('@bolt/join-channel-request')],
+      ['@bolt/initWorker', getEncoding('@bolt/init-worker-request')],
       ['@bolt/getFeed', getEncoding('@bolt/empty-request')],
       ['@bolt/initChannel', getEncoding('@bolt/init-channel-request')],
       ['@bolt/uploadVideo', getEncoding('@bolt/upload-video-request')],
-      ['@bolt/getUploads', getEncoding('@bolt/empty-request')],
+      ['@bolt/getUploads', getEncoding('@bolt/get-uploads-request')],
+      ['@bolt/getChannels', getEncoding('@bolt/get-channels-request')],
       ['@bolt/startStream', getEncoding('@bolt/start-stream-request')],
       ['@bolt/injectEvent', getEncoding('@bolt/inject-event-request')],
       ['@bolt/downloadVideo', getEncoding('@bolt/download-video-request')],
@@ -56,20 +60,20 @@ class HRPC {
       ['@bolt/channelEvent', getEncoding('@bolt/channel-event')],
       ['@bolt/uploadProgress', getEncoding('@bolt/upload-progress')],
       ['@bolt/downloadProgress', getEncoding('@bolt/download-progress')],
-      ['@bolt/errorEvent', getEncoding('@bolt/error-event')],
-      ['@bolt/initWorker', getEncoding('@bolt/init-worker-request')]
+      ['@bolt/errorEvent', getEncoding('@bolt/error-event')]
     ])
     this._responseEncodings = new Map([
       ['@bolt/joinChannel', getEncoding('@bolt/channel-response')],
       ['@bolt/leaveChannel', getEncoding('@bolt/channel-response')],
+      ['@bolt/initWorker', getEncoding('@bolt/init-worker-response')],
       ['@bolt/getFeed', getEncoding('@bolt/get-feed-response')],
       ['@bolt/initChannel', getEncoding('@bolt/init-channel-response')],
       ['@bolt/uploadVideo', getEncoding('@bolt/upload-video-response')],
       ['@bolt/getUploads', getEncoding('@bolt/get-uploads-response')],
+      ['@bolt/getChannels', getEncoding('@bolt/get-channels-response')],
       ['@bolt/startStream', getEncoding('@bolt/start-stream-response')],
       ['@bolt/injectEvent', getEncoding('@bolt/success-response')],
-      ['@bolt/downloadVideo', getEncoding('@bolt/download-video-response')],
-      ['@bolt/initWorker', getEncoding('@bolt/init-worker-response')]
+      ['@bolt/downloadVideo', getEncoding('@bolt/download-video-response')]
     ])
     this._rpc = new RPC(stream, async (req) => {
       const command = methods.get(req.command)
@@ -175,6 +179,10 @@ class HRPC {
     return this._call('@bolt/leaveChannel', args)
   }
 
+  async initWorker(args) {
+    return this._call('@bolt/initWorker', args)
+  }
+
   async getFeed(args) {
     return this._call('@bolt/getFeed', args)
   }
@@ -189,6 +197,10 @@ class HRPC {
 
   async getUploads(args) {
     return this._call('@bolt/getUploads', args)
+  }
+
+  async getChannels(args) {
+    return this._call('@bolt/getChannels', args)
   }
 
   async startStream(args) {
@@ -223,16 +235,16 @@ class HRPC {
     return this._callSync('@bolt/errorEvent', args)
   }
 
-  async initWorker(args) {
-    return this._call('@bolt/initWorker', args)
-  }
-
   onJoinChannel(responseFn) {
     this._handlers['@bolt/joinChannel'] = responseFn
   }
 
   onLeaveChannel(responseFn) {
     this._handlers['@bolt/leaveChannel'] = responseFn
+  }
+
+  onInitWorker(responseFn) {
+    this._handlers['@bolt/initWorker'] = responseFn
   }
 
   onGetFeed(responseFn) {
@@ -249,6 +261,10 @@ class HRPC {
 
   onGetUploads(responseFn) {
     this._handlers['@bolt/getUploads'] = responseFn
+  }
+
+  onGetChannels(responseFn) {
+    this._handlers['@bolt/getChannels'] = responseFn
   }
 
   onStartStream(responseFn) {
@@ -281,10 +297,6 @@ class HRPC {
 
   onErrorEvent(responseFn) {
     this._handlers['@bolt/errorEvent'] = responseFn
-  }
-
-  onInitWorker(responseFn) {
-    this._handlers['@bolt/initWorker'] = responseFn
   }
 
   _requestIsStream(command) {

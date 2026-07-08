@@ -74,8 +74,21 @@ schemaNs.register({
 })
 
 schemaNs.register({
+  name: 'get-uploads-request',
+  fields: [{ name: 'channelKey', type: 'string' }]
+})
+schemaNs.register({
   name: 'get-uploads-response',
   fields: [{ name: 'channelJson', type: 'string' }]
+})
+
+schemaNs.register({
+  name: 'get-channels-request',
+  fields: []
+})
+schemaNs.register({
+  name: 'get-channels-response',
+  fields: [{ name: 'channelsJson', type: 'string' }]
 })
 
 schemaNs.register({
@@ -185,8 +198,13 @@ ns.register({
 })
 ns.register({
   name: 'getUploads',
-  request: { name: '@bolt/empty-request', stream: false },
+  request: { name: '@bolt/get-uploads-request', stream: false },
   response: { name: '@bolt/get-uploads-response', stream: false }
+})
+ns.register({
+  name: 'getChannels',
+  request: { name: '@bolt/get-channels-request', stream: false },
+  response: { name: '@bolt/get-channels-response', stream: false }
 })
 ns.register({
   name: 'startStream',

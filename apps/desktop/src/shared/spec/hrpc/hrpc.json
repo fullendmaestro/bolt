@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 1,
   "schema": [
     {
       "id": 0,
@@ -29,6 +29,19 @@
     },
     {
       "id": 2,
+      "name": "@bolt/initWorker",
+      "request": {
+        "name": "@bolt/init-worker-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/init-worker-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 3,
       "name": "@bolt/getFeed",
       "request": {
         "name": "@bolt/empty-request",
@@ -41,7 +54,7 @@
       "version": 1
     },
     {
-      "id": 3,
+      "id": 4,
       "name": "@bolt/initChannel",
       "request": {
         "name": "@bolt/init-channel-request",
@@ -54,7 +67,7 @@
       "version": 1
     },
     {
-      "id": 4,
+      "id": 5,
       "name": "@bolt/uploadVideo",
       "request": {
         "name": "@bolt/upload-video-request",
@@ -67,10 +80,10 @@
       "version": 1
     },
     {
-      "id": 5,
+      "id": 6,
       "name": "@bolt/getUploads",
       "request": {
-        "name": "@bolt/empty-request",
+        "name": "@bolt/get-uploads-request",
         "stream": false
       },
       "response": {
@@ -80,7 +93,20 @@
       "version": 1
     },
     {
-      "id": 6,
+      "id": 7,
+      "name": "@bolt/getChannels",
+      "request": {
+        "name": "@bolt/get-channels-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/get-channels-response",
+        "stream": false
+      },
+      "version": 1
+    },
+    {
+      "id": 8,
       "name": "@bolt/startStream",
       "request": {
         "name": "@bolt/start-stream-request",
@@ -93,7 +119,7 @@
       "version": 1
     },
     {
-      "id": 7,
+      "id": 9,
       "name": "@bolt/injectEvent",
       "request": {
         "name": "@bolt/inject-event-request",
@@ -106,7 +132,7 @@
       "version": 1
     },
     {
-      "id": 8,
+      "id": 10,
       "name": "@bolt/downloadVideo",
       "request": {
         "name": "@bolt/download-video-request",
@@ -119,7 +145,7 @@
       "version": 1
     },
     {
-      "id": 9,
+      "id": 11,
       "name": "@bolt/workerReady",
       "request": {
         "name": "@bolt/empty-request",
@@ -128,7 +154,7 @@
       "version": 1
     },
     {
-      "id": 10,
+      "id": 12,
       "name": "@bolt/channelEvent",
       "request": {
         "name": "@bolt/channel-event",
@@ -137,7 +163,7 @@
       "version": 1
     },
     {
-      "id": 11,
+      "id": 13,
       "name": "@bolt/uploadProgress",
       "request": {
         "name": "@bolt/upload-progress",
@@ -146,7 +172,7 @@
       "version": 1
     },
     {
-      "id": 12,
+      "id": 14,
       "name": "@bolt/downloadProgress",
       "request": {
         "name": "@bolt/download-progress",
@@ -155,26 +181,13 @@
       "version": 1
     },
     {
-      "id": 13,
+      "id": 15,
       "name": "@bolt/errorEvent",
       "request": {
         "name": "@bolt/error-event",
         "send": true
       },
       "version": 1
-    },
-    {
-      "id": 2,
-      "name": "@bolt/initWorker",
-      "request": {
-        "name": "@bolt/init-worker-request",
-        "stream": false
-      },
-      "response": {
-        "name": "@bolt/init-worker-response",
-        "stream": false
-      },
-      "version": 2
     }
   ]
 }

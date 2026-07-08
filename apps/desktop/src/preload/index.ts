@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   joinChannel: (channelKey: string) => ipcRenderer.invoke('channel:join', channelKey),
   leaveChannel: (channelKey: string) => ipcRenderer.invoke('channel:leave', channelKey),
   getJoinedChannels: () => ipcRenderer.invoke('channel:list'),
+  getChannels: () => ipcRenderer.invoke('channels:get'),
   initChannel: (name: string, description: string, avatarPath?: string) =>
     ipcRenderer.invoke('channel:init', name, description, avatarPath),
 
@@ -29,7 +30,7 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   // ── Upload / Studio ───────────────────────────────────────
   selectAndUploadVideo: (title: string, thumbnailPath?: string) =>
     ipcRenderer.invoke('video:select-and-upload', title, thumbnailPath),
-  getUploads: () => ipcRenderer.invoke('uploads:get'),
+  getUploads: (channelKey?: string) => ipcRenderer.invoke('uploads:get', channelKey),
 
   // ── Streaming ─────────────────────────────────────────────
   getStreamUrl: (channelKey: string, videoId: string) =>
