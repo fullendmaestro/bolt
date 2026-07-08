@@ -25,6 +25,9 @@ export function Watch({
   const [joined, setJoined] = useState(false)
   const [downloadState, setDownloadState] = useState<DownloadState>('idle')
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [downloadBytesReceived, setDownloadBytesReceived] = useState(0)
+  const [downloadTotalBytes, setDownloadTotalBytes] = useState(0)
+  const [swarmCount, setSwarmCount] = useState<number>(0)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Parse compound ID (channelKey:videoId)
@@ -45,6 +48,8 @@ export function Watch({
         toast.error(`Failed to load stream: ${msg.message}`)
       } else if (msg.type === 'download-progress' && msg.channelKey === channelKey && msg.videoId === videoId) {
         setDownloadProgress(msg.percent)
+        setDownloadBytesReceived(msg.bytesReceived || 0)
+        setDownloadTotalBytes(msg.totalBytes || 0)
         setDownloadState('downloading')
       } else if (msg.type === 'download-complete' && msg.channelKey === channelKey && msg.videoId === videoId) {
         setDownloadState('complete')
@@ -56,11 +61,17 @@ export function Watch({
       }
     }
 
+    const handleChannelEvent = (msg: any) => {
+      if (msg.type === 'swarm-stats') setSwarmCount(msg.count)
+    }
+
     window.qvacAPI.onP2PMessage(handleMessage)
+    window.qvacAPI.onChannelEvent(handleChannelEvent)
     window.qvacAPI.getStreamUrl(channelKey, videoId)
 
     return () => {
       window.qvacAPI.removeP2PMessageListener()
+      window.qvacAPI.removeChannelEventListener?.()
     }
   }, [channelKey, videoId])
 
@@ -172,7 +183,7 @@ export function Watch({
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-[#F1F1F1]">{displayChannel}</span>
                 <span className="text-xs text-[#AAAAAA]">
-                  0 Viewers
+                  0 Viewers • {swarmCount} Peers
                 </span>
               </div>
               <button
@@ -222,10 +233,16 @@ export function Watch({
                       <span className="hidden sm:inline">Seeding</span>
                     </>
                   ) : downloadState === 'downloading' ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="hidden sm:inline">{downloadProgress}%</span>
-                    </>
+                    <div className="flex flex-col items-center gap-1 min-w-[80px]">
+                      <div className="w-full bg-indigo-900/50 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-indigo-400 h-full transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                      </div>
+                      <span className="text-[10px] text-indigo-300 leading-none">
+                        {downloadTotalBytes > 0 
+                          ? `${(downloadBytesReceived / 1024 / 1024).toFixed(1)} / ${(downloadTotalBytes / 1024 / 1024).toFixed(1)} MB` 
+                          : `${downloadProgress}%`}
+                      </span>
+                    </div>
                   ) : (
                     <>
                       <Download className="h-4 w-4" />

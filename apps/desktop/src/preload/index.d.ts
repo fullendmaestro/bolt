@@ -20,6 +20,7 @@ declare global {
       joinChannel: (channelKey: string) => Promise<void>
       leaveChannel: (channelKey: string) => Promise<void>
       getJoinedChannels: () => Promise<string[]>
+      getChannels: () => Promise<{ owned: any[]; joined: any[] }>
       initChannel: (name: string, description: string, avatarPath?: string) => Promise<void>
 
       // Asset Selectors
@@ -31,7 +32,7 @@ declare global {
 
       // Upload / Studio
       selectAndUploadVideo: (title: string, thumbnailPath?: string) => Promise<{ canceled: boolean; filePath?: string }>
-      getUploads: () => Promise<void>
+      getUploads: (channelKey?: string) => Promise<void>
 
       // Streaming
       getStreamUrl: (channelKey: string, videoId: string) => Promise<void>

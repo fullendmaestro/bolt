@@ -107,8 +107,8 @@ function initP2PWorker(): void {
     win?.webContents.send('p2p-worker-message', { type: 'error', message, command })
   })
 
-  rpc.onUploadProgress(({ videoId, percent }) => {
-    win?.webContents.send('p2p-worker-message', { type: 'upload-progress', videoId, percent })
+  rpc.onUploadProgress(({ videoId, percent, bytesReceived, totalBytes }) => {
+    win?.webContents.send('p2p-worker-message', { type: 'upload-progress', videoId, percent, bytesReceived, totalBytes })
   })
 
   rpc.onDownloadProgress(({ videoId, channelKey, percent, bytesReceived, totalBytes }) => {

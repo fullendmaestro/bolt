@@ -31,6 +31,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 // ── Studio Page ────────────────────────────────────────────
 export function Studio() {
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadBytesReceived, setUploadBytesReceived] = useState(0)
+  const [uploadTotalBytes, setUploadTotalBytes] = useState(0)
   const [uploadTitle, setUploadTitle] = useState('')
   const [channelData, setChannelData] = useState<ChannelMetadata | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,8 +96,15 @@ export function Studio() {
           return { ...prev, videos: [msg.video, ...prev.videos] }
         })
         setUploading(false)
+        setUploadProgress(0)
+        setUploadBytesReceived(0)
+        setUploadTotalBytes(0)
         setUploadTitle('')
         toast.success('Video uploaded successfully!')
+      } else if (msg.type === 'upload-progress') {
+        setUploadProgress(msg.percent)
+        setUploadBytesReceived(msg.bytesReceived || 0)
+        setUploadTotalBytes(msg.totalBytes || 0)
       } else if (msg.type === 'channel-initialized') {
         setInitializing(false)
         setShowInitModal(false)
@@ -479,10 +489,20 @@ export function Studio() {
               className="bg-white text-black hover:bg-neutral-200 rounded-full px-6 py-5 text-sm font-semibold"
             >
               {uploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
+                <div className="flex flex-col items-center gap-1 min-w-[120px]">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-neutral-600" />
+                    <span>Uploading...</span>
+                  </div>
+                  <div className="w-full bg-neutral-300 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                  </div>
+                  <span className="text-[10px] text-neutral-600 leading-none">
+                    {uploadTotalBytes > 0 
+                      ? `${(uploadBytesReceived / 1024 / 1024).toFixed(1)} / ${(uploadTotalBytes / 1024 / 1024).toFixed(1)} MB` 
+                      : `${uploadProgress}%`}
+                  </span>
+                </div>
               ) : (
                 'Select Files to Seed'
               )}
