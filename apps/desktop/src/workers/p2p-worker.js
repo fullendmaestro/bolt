@@ -79,7 +79,9 @@ function getMimeType(filePath) {
 
 rpc.onInitWorker(async (req) => {
   try {
-    const savedChannels = await store.getUserData('owned-channels')
+    const appStateCore = store.get({ name: 'bolt-app-state' })
+    await appStateCore.ready()
+    const savedChannels = await appStateCore.getUserData('owned-channels')
     if (savedChannels) {
       const parsed = JSON.parse(savedChannels.toString())
       parsed.forEach(k => ownedChannels.add(k))
@@ -117,7 +119,9 @@ rpc.onInitChannel(async (req) => {
   const ownChannelKey = b4a.toString(baseCore.key, 'hex')
   const blobsKeyHex = b4a.toString(blobsCore.key, 'hex')
   ownedChannels.add(ownChannelKey)
-  await store.setUserData('owned-channels', JSON.stringify(Array.from(ownedChannels)))
+  const appStateCore = store.get({ name: 'bolt-app-state' })
+  await appStateCore.ready()
+  await appStateCore.setUserData('owned-channels', Buffer.from(JSON.stringify(Array.from(ownedChannels))))
 
   let avatarBlob = null
   let avatarExt = ''
