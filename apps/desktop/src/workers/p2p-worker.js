@@ -41,7 +41,8 @@ const ownedChannels = new Set()
 // ── Blind Peering ──
 // For testing, we connect to a local blind-peer-cli if it exists.
 // We use a dummy key here or pass it in. If none, blind-peering just stays inactive.
-const blindPeers = [] // You can add local blind-peer public keys here
+const relayKey = (typeof Bare !== 'undefined' && Bare.env && Bare.env.BLIND_PEER_KEY) || '0000000000000000000000000000000000000000000000000000000000000000'
+const blindPeers = [ b4a.from(relayKey, 'hex') ] 
 const blinds = new BlindPeering(swarm, blindPeers)
 
 // ── Swarm ──
@@ -77,6 +78,16 @@ function getMimeType(filePath) {
 // ── RPC Handlers ──
 
 rpc.onInitWorker(async (req) => {
+  try {
+    const savedChannels = await store.getUserData('owned-channels')
+    if (savedChannels) {
+      const parsed = JSON.parse(savedChannels.toString())
+      parsed.forEach(k => ownedChannels.add(k))
+    }
+  } catch (err) {
+    console.error('Failed to load owned channels', err)
+  }
+
   if (req.ownedChannels) {
     req.ownedChannels.forEach(k => ownedChannels.add(k))
   }
@@ -106,6 +117,7 @@ rpc.onInitChannel(async (req) => {
   const ownChannelKey = b4a.toString(baseCore.key, 'hex')
   const blobsKeyHex = b4a.toString(blobsCore.key, 'hex')
   ownedChannels.add(ownChannelKey)
+  await store.setUserData('owned-channels', JSON.stringify(Array.from(ownedChannels)))
 
   let avatarBlob = null
   let avatarExt = ''
@@ -180,6 +192,7 @@ rpc.onJoinChannel(async (req) => {
   })
   await autobase.ready()
 
+  blinds.addAutobase(autobase)
   swarm.join(baseCore.discoveryKey, { client: true, server: false })
 
   const channelData = {
@@ -218,6 +231,7 @@ async function processAutobaseNode(channelKey, channelData, msg) {
       swarm.join(blobsCore.discoveryKey, { client: true, server: false })
       channelData.blobsCore = blobsCore
       channelData.blobs = new Hyperblobs(blobsCore)
+      blinds.addCore(blobsCore)
     }
   } else if (msg.type === 'video') {
     if (!channelData.videos.find(v => v.id === msg.video.id)) {
@@ -232,6 +246,9 @@ async function processAutobaseNode(channelKey, channelData, msg) {
 rpc.onLeaveChannel(async (req) => {
   const { channelKey } = req
   if (channels.has(channelKey) && !ownedChannels.has(channelKey)) {
+    const channel = channels.get(channelKey)
+    if (channel.baseCore) await swarm.leave(channel.baseCore.discoveryKey)
+    if (channel.blobsCore) await swarm.leave(channel.blobsCore.discoveryKey)
     channels.delete(channelKey)
   }
   return { channelKey }
@@ -247,14 +264,14 @@ rpc.onGetFeed(async () => {
     // Support legacy avatarPath
     let channelAvatar = channel.metadata.avatarPath || ''
     if (channel.blobsCore && channel.metadata.avatarBlob) {
-      channelAvatar = blobServer.getLink(channel.blobsCore.key, { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
+      channelAvatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
     }
 
     for (const video of channel.videos) {
       // Support legacy thumbnailPath
       let thumbnailPath = video.thumbnailPath || ''
       if (channel.blobsCore && video.thumbnailBlob) {
-        thumbnailPath = blobServer.getLink(channel.blobsCore.key, { blob: video.thumbnailBlob, type: getMimeType('dummy' + video.thumbnailExt) })
+        thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: video.thumbnailBlob, type: getMimeType('dummy' + video.thumbnailExt) })
       }
 
       items.push({
@@ -273,8 +290,33 @@ rpc.onGetFeed(async () => {
   return { itemsJson: JSON.stringify(items) }
 })
 
-rpc.onGetUploads(async () => {
-  const activeChannelKey = Array.from(ownedChannels).pop()
+rpc.onGetChannels(async () => {
+  const owned = []
+  const joined = []
+
+  for (const [channelKey, channel] of channels) {
+    let avatar = channel.metadata.avatarPath || ''
+    if (channel.blobsCore && channel.metadata.avatarBlob) {
+      avatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
+    }
+
+    const info = {
+      publicKey: channelKey,
+      name: channel.metadata.name || 'Loading...',
+      description: channel.metadata.description || '',
+      avatar,
+      isOwned: ownedChannels.has(channelKey)
+    }
+
+    if (info.isOwned) owned.push(info)
+    else joined.push(info)
+  }
+
+  return { channelsJson: JSON.stringify({ owned, joined }) }
+})
+
+rpc.onGetUploads(async (req) => {
+  const activeChannelKey = req.channelKey || Array.from(ownedChannels).pop()
   if (!activeChannelKey || !channels.has(activeChannelKey)) {
     return { channelJson: JSON.stringify(null) }
   }
@@ -282,13 +324,13 @@ rpc.onGetUploads(async () => {
   const channel = channels.get(activeChannelKey)
   let avatar = channel.metadata.avatarPath || ''
   if (channel.blobsCore && channel.metadata.avatarBlob) {
-    avatar = blobServer.getLink(channel.blobsCore.key, { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
+    avatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
   }
 
   const videos = channel.videos.map(v => {
     let thumbnailPath = v.thumbnailPath || ''
     if (channel.blobsCore && v.thumbnailBlob) {
-      thumbnailPath = blobServer.getLink(channel.blobsCore.key, { blob: v.thumbnailBlob, type: getMimeType('dummy' + v.thumbnailExt) })
+      thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: v.thumbnailBlob, type: getMimeType('dummy' + v.thumbnailExt) })
     }
     return { ...v, thumbnailPath }
   })
@@ -382,7 +424,7 @@ rpc.onStartStream(async (req) => {
 
   if (!channel.blobsCore) throw new Error('Blobs core not ready')
 
-  const link = blobServer.getLink(channel.blobsCore.key, { blob: video.blob, type: getMimeType(video.filename) })
+  const link = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: video.blob, type: getMimeType(video.filename) })
   
   return { url: link, channelKey, videoId }
 })

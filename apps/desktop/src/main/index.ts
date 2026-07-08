@@ -91,17 +91,11 @@ function initP2PWorker(): void {
 
   rpc.onWorkerReady(() => {
     console.log('P2P Worker is ready')
-    const ownedChannels = localStore.get('ownedChannels', [])
-    rpc.initWorker({ ownedChannels }).catch(console.error)
+    rpc.initWorker({}).catch(console.error)
 
     const savedChannels = localStore.get('joinedChannels', [])
     for (const key of savedChannels) {
       rpc.joinChannel({ channelKey: key }).catch(console.error)
-    }
-    const ownKey = localStore.get('ownChannelKey', null)
-    if (ownKey && !ownedChannels.includes(ownKey)) {
-      ownedChannels.push(ownKey)
-      localStore.set('ownedChannels', ownedChannels)
     }
   })
 
@@ -185,14 +179,14 @@ function setupHandlers(): void {
     return localStore.get('joinedChannels', [])
   })
 
+  ipcMain.handle('channels:get', async () => {
+    const res = await rpc.getChannels({})
+    return JSON.parse(res.channelsJson)
+  })
+
   ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
     try {
       const res = await rpc.initChannel({ name, description, avatarPath: avatarPath || '' })
-      const ownedChannels = localStore.get('ownedChannels', []) as string[]
-      if (!ownedChannels.includes(res.publicKey)) {
-        ownedChannels.push(res.publicKey)
-        localStore.set('ownedChannels', ownedChannels)
-      }
       win?.webContents.send('p2p-worker-message', { type: 'channel-initialized', publicKey: res.publicKey, name: res.name })
       return res.publicKey
     } catch (err: any) {
@@ -240,15 +234,13 @@ function setupHandlers(): void {
     }
 
     const filePath = result.filePaths[0]
-    const ownedChannels = localStore.get('ownedChannels', [])
-    const activeChannel = ownedChannels.length > 0 ? ownedChannels[ownedChannels.length - 1] : ''
 
     rpc.uploadVideo({
       filePath,
       title: title || 'Untitled Upload',
       duration: '0:00',
       thumbnailPath: thumbnailPath || '',
-      channelKey: activeChannel
+      channelKey: ''
     }).then((res) => {
       win?.webContents.send('p2p-worker-message', { type: 'upload-complete', video: JSON.parse(res.videoJson) })
     }).catch((err) => {
@@ -257,8 +249,8 @@ function setupHandlers(): void {
     return { canceled: false, filePath }
   })
 
-  ipcMain.handle('uploads:get', async () => {
-    const res = await rpc.getUploads({})
+  ipcMain.handle('uploads:get', async (_event, channelKey?: string) => {
+    const res = await rpc.getUploads({ channelKey: channelKey || '' })
     win?.webContents.send('p2p-worker-message', { type: 'uploads-data', channel: JSON.parse(res.channelJson) })
   })
 
@@ -289,9 +281,7 @@ function setupHandlers(): void {
 
   // ── Event Injection Handler ───────────────────────────
   ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'>) => {
-    const ownedChannels = localStore.get('ownedChannels', [])
-    const activeChannel = ownedChannels.length > 0 ? ownedChannels[ownedChannels.length - 1] : ''
-    await rpc.injectEvent({ channelKey: activeChannel, eventJson: JSON.stringify(eventData) })
+    await rpc.injectEvent({ channelKey: '', eventJson: JSON.stringify(eventData) })
   })
 
   // ── Legacy P2P Send (backward compatibility) ──────────
@@ -321,6 +311,12 @@ app.whenReady().then(() => {
   initP2PWorker()
 })
 
+app.on('before-quit', () => {
+  if (rpc && rpc._stream) {
+    rpc._stream.destroy()
+  }
+})
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  app.quit()
 })
