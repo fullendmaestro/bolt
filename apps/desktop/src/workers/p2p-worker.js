@@ -247,14 +247,18 @@ async function processAutobaseNode(channelKey, channelData, msg) {
     channelData.metadata.avatarExt = msg.avatarExt
     channelData.metadata.blobsKey = msg.blobsKey
     channelData.metadata.avatarPath = msg.avatarPath || '' // Legacy fallback
-    
-    if (!channelData.blobsCore) {
-      const blobsCore = store.get({ key: b4a.from(msg.blobsKey, 'hex') })
-      await blobsCore.ready()
-      swarm.join(blobsCore.discoveryKey, { client: true, server: false })
-      channelData.blobsCore = blobsCore
-      channelData.blobs = new Hyperblobs(blobsCore)
-      blinds.addCore(blobsCore)
+    // FIX: Instantiate the blobsCore for joined channels so media can load
+    if (!channelData.blobsCore && msg.blobsKey) {
+      const blobsCoreKey = b4a.from(msg.blobsKey, 'hex')
+      channelData.blobsCore = store.get({ key: blobsCoreKey })
+      await channelData.blobsCore.ready()
+      channelData.blobs = new Hyperblobs(channelData.blobsCore)
+      
+      // Join the swarm to find peers hosting the media
+      swarm.join(channelData.blobsCore.discoveryKey, { client: true, server: false })
+      
+      // Keep blobs available if blind peering is active
+      if (typeof blinds !== 'undefined') blinds.addCore(channelData.blobsCore)
     }
   } else if (msg.type === 'video') {
     if (!channelData.videos.find(v => v.id === msg.video.id)) {
@@ -283,38 +287,42 @@ rpc.onGetFeed(async () => {
   for (const [channelKey, channel] of channels) {
     if (!channel.metadata.name || channel.metadata.name === 'Loading...') continue
 
-    const channelName = channel.metadata.name
-    
-    // Support legacy avatarPath
+    // 1. Format the Channel Avatar
     let channelAvatar = channel.metadata.avatarPath || ''
     if (channel.blobsCore && channel.metadata.avatarBlob) {
-      channelAvatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
+      channelAvatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { 
+        blob: channel.metadata.avatarBlob, 
+        type: getMimeType('dummy' + channel.metadata.avatarExt) 
+      })
     }
 
-    for (const video of channel.videos) {
-      // Support legacy thumbnailPath
-      let thumbnailPath = video.thumbnailPath || ''
-      if (channel.blobsCore && video.thumbnailBlob) {
-        thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: video.thumbnailBlob, type: getMimeType('dummy' + video.thumbnailExt) })
+    // 2. Format all Videos in the channel
+    for (const v of channel.videos) {
+      let thumbnailPath = v.thumbnailPath || ''
+      if (channel.blobsCore && v.thumbnailBlob) {
+        thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { 
+          blob: v.thumbnailBlob, 
+          type: getMimeType('dummy' + v.thumbnailExt) 
+        })
       }
-
-      const safeVideo = { ...video }
+      
+      const safeVideo = { ...v }
       delete safeVideo.blob
       delete safeVideo.thumbnailBlob
+      safeVideo.thumbnailPath = thumbnailPath
 
       items.push({
-        video: {
-          ...safeVideo,
-          thumbnailPath
-        },
         channelKey,
-        channelName,
-        channelAvatar
+        channelName: channel.metadata.name,
+        channelAvatar,
+        video: safeVideo
       })
     }
   }
-
+  
+  // Sort from newest to oldest
   items.sort((a, b) => new Date(b.video.timestamp).getTime() - new Date(a.video.timestamp).getTime())
+  
   return { itemsJson: JSON.stringify(items) }
 })
 
