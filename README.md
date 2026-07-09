@@ -1,24 +1,83 @@
-# Bolt Sports
+# Bolt P2P ⚡️
 
-Bolt Sports is a decentralized, peer-to-peer (P2P) sports streaming and content sharing platform built on Holepunch (Pear runtime) and Electron. It utilizes a schema-first Inter-Process Communication (IPC) architecture and an append-only distributed ledger for robust media synchronization across localized nodes.
+A decentralized, peer-to-peer sports streaming platform built on the Holepunch stack. Bolt completely removes central servers, allowing creators to broadcast, users to watch, and the community to seed streams locally without relying on centralized server.
 
-## Core Architecture
-- **Pear Runtime & Holepunch:** True P2P swarm connectivity using DHT-based discovery. No centralized servers are required for finding peers or routing media.
-- **Autobase & Corestore:** Deterministic multi-writer linearization handles decentralized chat and event feeds, synchronized securely using Hypercore.
-- **Hyperblobs & BlobServer:** Videos, avatars, and thumbnails are sharded and distributed on the P2P network, served efficiently to the local browser via an integrated HTTP range-request server.
-- **Schema-First IPC (hrpc):** Strict backward/forward compatible communication between the Electron UI and the Bare worker, automatically generated using `hyperschema`.
+---
 
-## Development
+## 🛠️ Tech Stack
 
-You can run multiple instances of the app locally to test P2P connectivity on your machine.
+* **Frontend:** React, Tailwind CSS, Shadcn UI, Vite.
 
-1. **Install Dependencies:**
-   ```bash
-   pnpm install
-   ```
 
-2. **Run Multi-Peer Development Environment:**
-   ```bash
-   pnpm run dev:peers
-   ```
-   *This uses Turborepo in TUI mode to safely stagger and launch three isolated peer instances side-by-side.*
+* **Desktop Environment:** Electron.
+
+
+* **P2P Backend:** Pear Runtime, Bare, Corestore, Hyperswarm, Autobase.
+
+
+* **Local AI:** LLaMA 3.2 / QVAC SDK.
+
+
+* **IPC/RPC:** HRPC (Hyperschema RPC) for seamless communication between Electron and the isolated Pear worker.
+
+
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+* Node.js (v20+)
+
+
+* `pnpm` (v10.33.4+)
+
+
+
+### Installation & Running
+
+1. Install dependencies across the monorepo:
+```bash
+pnpm install
+
+```
+
+
+2. Run the standard development environment:
+```bash
+pnpm run dev
+
+```
+
+
+3. **Testing the Swarm Locally:**
+To test peer-to-peer connections on a single machine, use the included Turborepo script to spin up multiple isolated instances (Seeder, Peer-1, Peer-2):
+```bash
+pnpm run dev:peers
+
+```
+
+
+Or to preview the built application with multiple peers:
+```bash
+pnpm run preview:peers
+
+```
+
+
+
+### Clearing Data
+
+If you need to wipe your local Corestore and channel data to start fresh:
+
+```bash
+pnpm run clean:data
+
+```
+
+---
+
+## 🏗️ Architecture
+
+Bolt runs a **Pear Runtime worker** in the background that handles all Holepunch networking, keeping the heavy P2P lifting separate from the UI thread. The frontend (React) talks to the Main Process (Electron), which communicates with the Worker via a custom `HRPC` protocol over Bare IPC.
