@@ -39,13 +39,14 @@ export function Studio() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [initializing, setInitializing] = useState(false)
-  
+
   // Channels List State
   const [channelsList, setChannelsList] = useState<{ owned: any[], joined: any[] }>({ owned: [], joined: [] })
   const [activeChannelKey, setActiveChannelKey] = useState<string | null>(null)
 
   // Dialog state
   const [showInitModal, setShowInitModal] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false) // <-- New Upload Modal State
   const [channelName, setChannelName] = useState('')
   const [channelDesc, setChannelDesc] = useState('')
   const [initError, setInitError] = useState<string | null>(null)
@@ -60,7 +61,7 @@ export function Studio() {
     try {
       const list = await window.qvacAPI.getChannels()
       setChannelsList(list)
-      
+
       let keyToSelect = selectKey || activeChannelKey
       if (!keyToSelect) {
         if (list.owned.length > 0) keyToSelect = list.owned[list.owned.length - 1].publicKey
@@ -100,6 +101,7 @@ export function Studio() {
         setUploadBytesReceived(0)
         setUploadTotalBytes(0)
         setUploadTitle('')
+        setShowUploadModal(false) // Close modal on success
         toast.success('Video uploaded successfully!')
       } else if (msg.type === 'upload-progress') {
         setUploadProgress(msg.percent)
@@ -211,6 +213,8 @@ export function Studio() {
 
   return (
     <div className="max-w-[1400px] mx-auto p-6 md:p-8 flex gap-8 items-start">
+      {/* ── Modals ── */}
+
       {/* Shadcn Channel Init Dialog */}
       <Dialog open={showInitModal} onOpenChange={setShowInitModal}>
         <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-neutral-800 text-white">
@@ -310,80 +314,188 @@ export function Studio() {
         </DialogContent>
       </Dialog>
 
+      {/* Upload Video Modal */}
+      <Dialog open={showUploadModal} onOpenChange={(open) => {
+        if (uploading && !open) {
+          toast.error('Please wait for the upload to finish or cancel it.')
+          return
+        }
+        setShowUploadModal(open)
+      }}>
+        <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-neutral-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Upload to {channelData?.name}</DialogTitle>
+            <DialogDescription className="text-neutral-400">
+              Seed a new video to your local corestore. You remain the sole owner of your data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-neutral-400 uppercase">Video Title</label>
+              <Input
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                placeholder="e.g. Match Highlights vs Arsenal"
+                className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 rounded-lg"
+                disabled={uploading}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-neutral-400 uppercase">Thumbnail</label>
+              <div className="flex items-center gap-3">
+                {thumbnailPreview ? (
+                  <div className="relative h-16 w-28 rounded-lg overflow-hidden shrink-0 border border-neutral-700 bg-black">
+                    <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                    {!uploading && (
+                      <button
+                        onClick={() => { setThumbnailPath(null); setThumbnailPreview(null) }}
+                        className="absolute top-1 right-1 bg-black/70 rounded-full p-1 text-white hover:bg-black"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-16 w-28 rounded-lg border-2 border-dashed border-neutral-700 bg-[#0F0F0F] flex items-center justify-center shrink-0">
+                    <ImagePlus className="h-5 w-5 text-neutral-600" />
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleSelectThumbnail}
+                  disabled={uploading}
+                  className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs"
+                >
+                  {thumbnailPreview ? 'Change Thumbnail' : 'Add Thumbnail'}
+                </Button>
+              </div>
+            </div>
+
+            {uploading && (
+              <div className="mt-4 p-4 bg-neutral-900 rounded-lg border border-neutral-800">
+                <div className="flex justify-between text-xs text-neutral-400 mb-2">
+                  <span>Uploading to Corestore...</span>
+                  <span className="font-mono">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-indigo-500 h-full transition-all duration-300 ease-out"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <div className="text-right text-[10px] text-neutral-500 mt-1 font-mono">
+                  {(uploadBytesReceived / 1024 / 1024).toFixed(1)} MB / {(uploadTotalBytes / 1024 / 1024).toFixed(1)} MB
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowUploadModal(false)}
+              disabled={uploading}
+              className="hover:bg-neutral-800 hover:text-white text-neutral-300"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSelectAndUpload}
+              disabled={uploading}
+              className="bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Select File & Upload'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Sidebar (Channels List) ── */}
       <div className="w-80 shrink-0 flex flex-col gap-6">
         <h1 className="text-2xl font-bold text-white tracking-tight">Channel Studio</h1>
-        
+
         <Tabs defaultValue="owned" className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-neutral-900 mb-4 p-1 rounded-xl">
             <TabsTrigger value="owned" className="rounded-lg data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white text-neutral-400">My Channels</TabsTrigger>
             <TabsTrigger value="joined" className="rounded-lg data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white text-neutral-400">Joined</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="owned" className="flex flex-col gap-2 mt-0">
-             <Button variant="outline" onClick={() => setShowInitModal(true)} className="w-full border-dashed border-neutral-700 bg-transparent text-neutral-400 hover:text-white hover:border-neutral-500 mb-2">
-                <Plus className="h-4 w-4 mr-2" /> Create New Channel
-             </Button>
-             
-             {channelsList.owned.length === 0 && (
-               <p className="text-xs text-neutral-500 text-center py-4">You have not created any channels yet.</p>
-             )}
-             
-             {channelsList.owned.map(ch => (
-                <div 
-                  key={ch.publicKey} 
-                  onClick={() => handleSelectChannel(ch.publicKey)} 
-                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeChannelKey === ch.publicKey ? 'bg-indigo-500/10 border border-indigo-500/50' : 'bg-[#121212] border border-neutral-800 hover:bg-white/5'}`}
-                >
-                   <div className="h-10 w-10 rounded-full overflow-hidden bg-neutral-800 shrink-0">
-                     {ch.avatar ? (
-                       <img src={ch.avatar} alt={ch.name} className="w-full h-full object-cover" />
-                     ) : (
-                       <div className="w-full h-full flex items-center justify-center bg-indigo-500/20 text-indigo-400 font-bold">
-                         {ch.name.charAt(0).toUpperCase()}
-                       </div>
-                     )}
-                   </div>
-                   <div className="flex-1 min-w-0">
-                     <p className="text-sm font-semibold text-white truncate">{ch.name}</p>
-                     <p className="text-xs text-neutral-500 truncate">{ch.description || 'No description'}</p>
-                   </div>
+            <Button variant="outline" onClick={() => setShowInitModal(true)} className="w-full border-dashed border-neutral-700 bg-transparent text-neutral-400 hover:text-white hover:border-neutral-500 mb-2">
+              <Plus className="h-4 w-4 mr-2" /> Create New Channel
+            </Button>
+
+            {channelsList.owned.length === 0 && (
+              <p className="text-xs text-neutral-500 text-center py-4">You have not created any channels yet.</p>
+            )}
+
+            {channelsList.owned.map(ch => (
+              <div
+                key={ch.publicKey}
+                onClick={() => handleSelectChannel(ch.publicKey)}
+                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeChannelKey === ch.publicKey ? 'bg-indigo-500/10 border border-indigo-500/50' : 'bg-[#121212] border border-neutral-800 hover:bg-white/5'}`}
+              >
+                <div className="h-10 w-10 rounded-full overflow-hidden bg-neutral-800 shrink-0">
+                  {ch.avatar ? (
+                    <img src={ch.avatar} alt={ch.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-indigo-500/20 text-indigo-400 font-bold">
+                      {ch.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
-             ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{ch.name}</p>
+                  <p className="text-xs text-neutral-500 truncate">{ch.description || 'No description'}</p>
+                </div>
+              </div>
+            ))}
           </TabsContent>
-          
+
           <TabsContent value="joined" className="flex flex-col gap-2 mt-0">
-             {channelsList.joined.length === 0 && (
-               <p className="text-xs text-neutral-500 text-center py-4">You have not joined any channels yet.</p>
-             )}
-             {channelsList.joined.map(ch => (
-                <div 
-                  key={ch.publicKey} 
-                  onClick={() => handleSelectChannel(ch.publicKey)} 
-                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeChannelKey === ch.publicKey ? 'bg-indigo-500/10 border border-indigo-500/50' : 'bg-[#121212] border border-neutral-800 hover:bg-white/5'}`}
-                >
-                   <div className="h-10 w-10 rounded-full overflow-hidden bg-neutral-800 shrink-0">
-                     {ch.avatar ? (
-                       <img src={ch.avatar} alt={ch.name} className="w-full h-full object-cover" />
-                     ) : (
-                       <div className="w-full h-full flex items-center justify-center bg-emerald-500/20 text-emerald-400 font-bold">
-                         {ch.name.charAt(0).toUpperCase()}
-                       </div>
-                     )}
-                   </div>
-                   <div className="flex-1 min-w-0">
-                     <p className="text-sm font-semibold text-white truncate">{ch.name}</p>
-                     <p className="text-xs text-neutral-500 truncate">{ch.description || 'No description'}</p>
-                   </div>
+            {channelsList.joined.length === 0 && (
+              <p className="text-xs text-neutral-500 text-center py-4">You have not joined any channels yet.</p>
+            )}
+            {channelsList.joined.map(ch => (
+              <div
+                key={ch.publicKey}
+                onClick={() => handleSelectChannel(ch.publicKey)}
+                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeChannelKey === ch.publicKey ? 'bg-indigo-500/10 border border-indigo-500/50' : 'bg-[#121212] border border-neutral-800 hover:bg-white/5'}`}
+              >
+                <div className="h-10 w-10 rounded-full overflow-hidden bg-neutral-800 shrink-0">
+                  {ch.avatar ? (
+                    <img src={ch.avatar} alt={ch.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-emerald-500/20 text-emerald-400 font-bold">
+                      {ch.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
-             ))}
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{ch.name}</p>
+                  <p className="text-xs text-neutral-500 truncate">{ch.description || 'No description'}</p>
+                </div>
+              </div>
+            ))}
           </TabsContent>
         </Tabs>
       </div>
 
       {/* ── Main Content Area ── */}
       <div className="flex-1 min-w-0 flex flex-col gap-8">
-        
+
         {/* Studio Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -395,6 +507,15 @@ export function Studio() {
             </p>
           </div>
           <div className="flex gap-3">
+            {channelData && isCurrentChannelOwned && (
+              <Button
+                onClick={() => setShowUploadModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white border-none"
+              >
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Upload Video
+              </Button>
+            )}
             <Button variant="secondary" className="bg-neutral-800 hover:bg-neutral-700 text-white border-none">
               <BarChart className="mr-2 h-4 w-4" />
               Node Analytics
@@ -433,78 +554,6 @@ export function Studio() {
                   <Copy className="mr-2 h-4 w-4" />
                   Copy
                 </>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {/* Upload / Broadcast Action Area (Only for Owned Channels) */}
-        {channelData && isCurrentChannelOwned && (
-          <div className="border-2 border-dashed border-neutral-800 rounded-2xl bg-[#121212] p-10 flex flex-col items-center justify-center text-center hover:border-indigo-500/50 transition-colors group">
-            <div className="h-16 w-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <UploadCloud className="h-8 w-8 text-indigo-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Upload Video or Start Broadcast</h3>
-            <p className="text-sm text-neutral-400 max-w-md mb-4">
-              Files are added to your local corestore and seeded across the Holepunch network. You
-              remain the sole owner of your data.
-            </p>
-
-            <div className="flex items-center gap-3 mb-4 w-full max-w-sm">
-              <Input
-                value={uploadTitle}
-                onChange={(e) => setUploadTitle(e.target.value)}
-                placeholder="Video title..."
-                className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 rounded-xl"
-              />
-            </div>
-
-            {/* Thumbnail picker */}
-            <div className="flex items-center gap-3 mb-4">
-              {thumbnailPreview ? (
-                <div className="relative h-12 w-20 rounded-lg overflow-hidden shrink-0">
-                  <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => { setThumbnailPath(null); setThumbnailPreview(null) }}
-                    className="absolute top-0 right-0 bg-black/70 rounded-full p-0.5 text-white"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : null}
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleSelectThumbnail}
-                className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs"
-              >
-                <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
-                {thumbnailPreview ? 'Change Thumbnail' : 'Add Thumbnail'}
-              </Button>
-            </div>
-
-            <Button
-              onClick={handleSelectAndUpload}
-              disabled={uploading}
-              className="bg-white text-black hover:bg-neutral-200 rounded-full px-6 py-5 text-sm font-semibold"
-            >
-              {uploading ? (
-                <div className="flex flex-col items-center gap-1 min-w-[120px]">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-neutral-600" />
-                    <span>Uploading...</span>
-                  </div>
-                  <div className="w-full bg-neutral-300 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-                  </div>
-                  <span className="text-[10px] text-neutral-600 leading-none">
-                    {uploadTotalBytes > 0 
-                      ? `${(uploadBytesReceived / 1024 / 1024).toFixed(1)} / ${(uploadTotalBytes / 1024 / 1024).toFixed(1)} MB` 
-                      : `${uploadProgress}%`}
-                  </span>
-                </div>
-              ) : (
-                'Select Files to Seed'
               )}
             </Button>
           </div>
