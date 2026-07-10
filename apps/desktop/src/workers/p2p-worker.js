@@ -24,8 +24,11 @@ let transcribeModelId = null  // Transcription model for video pre-processing (P
 try {
   qvac = require('@qvac/bare-sdk')
   const { plugins } = require('@qvac/bare-sdk')
-  const parakeetPlugin = require('@qvac/bare-sdk/transcription-parakeet/plugin')
-  plugins([parakeetPlugin])
+  
+  // Dynamic import because plugin only exports 'import' condition
+  import('@qvac/bare-sdk/parakeet-transcription/plugin').then((mod) => {
+    plugins([mod.default || mod])
+  }).catch(e => console.error('Failed to load Parakeet plugin:', e))
 } catch (e) {
   console.warn('[Bolt Worker] @qvac/bare-sdk not available in Bare context – AI features disabled.', e.message)
 }
