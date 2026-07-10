@@ -19,7 +19,8 @@ const BlindPeering = require('blind-peering')
 // Loaded lazily via dynamic require so the Bare worker can import the SDK
 // without pulling in Electron-only entry points.
 let qvac = null
-let embedModelId = null // Shared embedding model for RAG operations (GTE_LARGE_FP16)
+let embedModelId = null       // Embedding model for RAG (GTE_LARGE_FP16)
+let transcribeModelId = null  // Transcription model for video pre-processing (PARAKEET_TDT_0_6B_V3_Q8_0)
 try {
   qvac = require('@qvac/sdk')
 } catch (e) {
@@ -452,30 +453,52 @@ rpc.onUploadVideo(async (req) => {
   // Run the local video through QVAC's transcribe() to extract a text transcript.
   // Then ingest into QVAC's RAG pipeline, namespaced by channel key so each
   // channel has its own searchable knowledge base in the shared Corestore.
+  //
+  // Key API facts (from SDK source):
+  //   transcribe({ modelId, audioChunk }) → Promise<string>  (plain string, not { text })
+  //   ragIngest({ modelId, workspace, documents: string[] })
   let transcript = ''
   if (qvac) {
     try {
-      console.log('[Bolt Worker] Transcribing video for RAG ingestion:', req.filePath)
-      const transcribeResult = await qvac.transcribe({ filePath: req.filePath })
-      transcript = transcribeResult?.text || ''
+      // ─ 1a. Lazily load the PARAKEET transcription model ─────────────────
+      if (!transcribeModelId) {
+        console.log('[Bolt Worker] Loading Parakeet transcription model...')
+        transcribeModelId = await qvac.loadModel({
+          modelSrc: qvac.PARAKEET_TDT_0_6B_V3_Q8_0,
+          modelType: 'parakeet'
+        })
+        console.log('[Bolt Worker] Transcription model loaded:', transcribeModelId)
+      }
 
+      // ─ 1b. Transcribe the video file ───────────────────────────────
+      // audioChunk accepts a file path string directly; result is a plain string.
+      console.log('[Bolt Worker] Transcribing video for RAG ingestion:', req.filePath)
+      transcript = await qvac.transcribe({
+        modelId: transcribeModelId,
+        audioChunk: req.filePath  // QVAC accepts the video/audio file path directly
+      })
+      // Normalise: SDK returns a string; guard against any unexpected falsy value
+      if (typeof transcript !== 'string') transcript = String(transcript || '')
+      console.log(`[Bolt Worker] Transcription complete: ${transcript.length} chars`)
+
+      // ─ 1c. RAG ingest if we got a non-empty transcript ────────────────
       if (transcript) {
-        // Lazily load the embedding model (GTE_LARGE_FP16) shared across all RAG ops
+        // Lazily load the GTE embedding model shared across all RAG ops
         if (!embedModelId) {
+          console.log('[Bolt Worker] Loading embedding model for RAG...')
           embedModelId = await qvac.loadModel({
             modelSrc: qvac.GTE_LARGE_FP16,
             modelType: 'embeddings'
           })
-          console.log('[Bolt Worker] Embedding model loaded for RAG:', embedModelId)
+          console.log('[Bolt Worker] Embedding model loaded:', embedModelId)
         }
-        // Namespace the RAG workspace per channel so embeddings are isolated.
-        // 'workspace' is the correct parameter name in the QVAC SDK API.
+        // Namespace the RAG workspace per channel so embeddings are isolated
         const workspace = `channel-rag-${activeChannelKey}`
         await qvac.ragIngest({
           modelId: embedModelId,
           workspace,
-          documents: [transcript], // API expects string[] not a docs array
-          chunk: true             // Let SDK auto-chunk the transcript
+          documents: [transcript],
+          chunk: true
         })
         console.log(`[Bolt Worker] RAG ingest complete for video ${videoId} (${transcript.length} chars)`)
       }
