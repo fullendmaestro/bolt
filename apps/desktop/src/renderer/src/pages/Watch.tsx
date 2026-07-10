@@ -14,7 +14,8 @@ export function Watch({
 }: {
   modelStatus: string
   modelProgress: number
-  loadModel: () => void
+  /** Task 2: Updated to accept optional channelOwnerKey for delegated inference */
+  loadModel: (channelOwnerKey?: string) => void
 }) {
   const { id } = useParams()
   const location = useLocation()
