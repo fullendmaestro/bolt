@@ -9,12 +9,15 @@ declare global {
     }
     qvacAPI: {
       // AI APIs
-      loadModel: () => Promise<string>
-      infer: (history: { role: string; content: string }[]) => Promise<void>
+      loadModel: (channelOwnerKey?: string) => Promise<string>
+      infer: (history: { role: string; content: string }[], options?: { kvCache?: boolean }) => Promise<void>
       unloadModel: () => Promise<string>
       onCompletionStream: (cb: (token: string) => void) => void
       onModelProgress: (cb: (progress: any) => void) => void
       removeModelProgressListener: () => void
+
+      // RAG
+      ragSearch: (channelKey: string, query: string) => Promise<{ id: string; content: string; score: number }[]>
 
       // Channel Management
       joinChannel: (channelKey: string) => Promise<void>

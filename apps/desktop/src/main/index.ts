@@ -5,9 +5,11 @@ import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   LLAMA_3_2_1B_INST_Q4_0,
+  GTE_LARGE_FP16,
   loadModel,
   unloadModel,
-  completion
+  completion,
+  ragSearch
 } from '@qvac/sdk'
 import Store from 'electron-store'
 import type { ChannelEvent } from '../shared/types'
@@ -19,6 +21,7 @@ app.commandLine.appendSwitch('no-sandbox')
 // ── State ──────────────────────────────────────────────────
 let win: BrowserWindow | null = null
 let modelId: string | null = null
+let embedModelId: string | null = null // Embedding model for RAG search
 let rpc: any = null
 
 // --- Strict Instance Isolation ---
@@ -127,10 +130,23 @@ function initP2PWorker(): void {
 // ── IPC Handlers ───────────────────────────────────────────
 function setupHandlers(): void {
   // ── QVAC AI Handlers ──────────────────────────────────
-  ipcMain.handle('load-model', async () => {
+  //
+  // Task 2: Dual-Mode Inference Engine
+  // If channelOwnerKey is provided, route the request to that peer's QVAC
+  // provider node. fallbackToLocal ensures we still work if the peer is offline.
+  ipcMain.handle('load-model', async (_event, channelOwnerKey?: string) => {
+    const delegateConfig = channelOwnerKey
+      ? {
+          providerPublicKey: channelOwnerKey,
+          fallbackToLocal: true,
+          timeout: 60000
+        }
+      : undefined
+
     modelId = await loadModel({
       modelSrc: LLAMA_3_2_1B_INST_Q4_0,
       modelType: 'llm',
+      delegate: delegateConfig,
       onProgress: (progress) => {
         console.log(progress)
         win?.webContents.send('model-progress', progress)
@@ -139,10 +155,12 @@ function setupHandlers(): void {
     return 'model loaded'
   })
 
-  ipcMain.handle('infer', async (_event, history) => {
+  // Task 3: KV Cache support — forward the kvCache flag to completion()
+  // so the LLM can cache attention state across the continuous event stream.
+  ipcMain.handle('infer', async (_event, history, options?: { kvCache?: boolean }) => {
     if (!modelId) throw new Error('Model not loaded.')
 
-    const result = completion({ modelId, history, stream: true })
+    const result = completion({ modelId, history, stream: true, kvCache: options?.kvCache ?? false })
     for await (const token of result.tokenStream) {
       win?.webContents.send('completion-stream', token)
     }
@@ -154,6 +172,31 @@ function setupHandlers(): void {
     await unloadModel({ modelId })
     modelId = null
     return 'model unloaded'
+  })
+
+  // Task 1: RAG Search — query the per-channel RAG workspace for context.
+  // An embedding model (GTE_LARGE_FP16) is loaded lazily on the first call
+  // and reused for all subsequent queries to avoid re-downloading on every call.
+  ipcMain.handle('rag:search', async (_event, channelKey: string, query: string) => {
+    try {
+      // Lazily load the embedding model if not already loaded
+      if (!embedModelId) {
+        embedModelId = await loadModel({
+          modelSrc: GTE_LARGE_FP16,
+          modelType: 'embeddings'
+        })
+      }
+      const workspace = `channel-rag-${channelKey}`
+      const results = await ragSearch({ modelId: embedModelId, workspace, query, topK: 5 })
+      return (results || []).map((r) => ({
+        id: (r as any).id ?? '',
+        content: (r as any).content ?? (r as any).text ?? '',
+        score: (r as any).score ?? 0
+      }))
+    } catch (err: any) {
+      console.error('[RAG] ragSearch failed:', err.message)
+      return []
+    }
   })
 
   // ── Channel Subscription Handlers ─────────────────────

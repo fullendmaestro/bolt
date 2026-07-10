@@ -19,6 +19,7 @@ const BlindPeering = require('blind-peering')
 // Loaded lazily via dynamic require so the Bare worker can import the SDK
 // without pulling in Electron-only entry points.
 let qvac = null
+let embedModelId = null // Shared embedding model for RAG operations (GTE_LARGE_FP16)
 try {
   qvac = require('@qvac/sdk')
 } catch (e) {
@@ -459,15 +460,22 @@ rpc.onUploadVideo(async (req) => {
       transcript = transcribeResult?.text || ''
 
       if (transcript) {
-        // Namespace the RAG workspace per channel so embeddings are isolated
-        const ragWorkspaceId = `channel-rag-${activeChannelKey}`
+        // Lazily load the embedding model (GTE_LARGE_FP16) shared across all RAG ops
+        if (!embedModelId) {
+          embedModelId = await qvac.loadModel({
+            modelSrc: qvac.GTE_LARGE_FP16,
+            modelType: 'embeddings'
+          })
+          console.log('[Bolt Worker] Embedding model loaded for RAG:', embedModelId)
+        }
+        // Namespace the RAG workspace per channel so embeddings are isolated.
+        // 'workspace' is the correct parameter name in the QVAC SDK API.
+        const workspace = `channel-rag-${activeChannelKey}`
         await qvac.ragIngest({
-          workspaceId: ragWorkspaceId,
-          docs: [{
-            id: videoId,
-            content: transcript,
-            metadata: { videoId, title: req.title, channelKey: activeChannelKey, timestamp: new Date().toISOString() }
-          }]
+          modelId: embedModelId,
+          workspace,
+          documents: [transcript], // API expects string[] not a docs array
+          chunk: true             // Let SDK auto-chunk the transcript
         })
         console.log(`[Bolt Worker] RAG ingest complete for video ${videoId} (${transcript.length} chars)`)
       }
