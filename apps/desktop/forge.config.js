@@ -2,7 +2,7 @@ const QvacForgePlugin = require('@qvac/sdk/electron-forge');
 
 module.exports = {
   packagerConfig: {
-    asar: true,
+    asar: false,
   },
   rebuildConfig: {},
   makers: [

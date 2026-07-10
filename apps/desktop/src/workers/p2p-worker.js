@@ -564,21 +564,21 @@ rpc.onInjectEvent(async (req) => {
   if (qvac && eventData.broadcastAudioPath) {
     ;(async () => {
       try {
-        console.log('[Bolt Worker] Starting live transcribeStream for broadcast audio')
-        const session = await qvac.transcribeStream({ filePath: eventData.broadcastAudioPath })
-        for await (const segment of session) {
-          if (!segment || !segment.text) continue
+        console.log('[Bolt Worker] Starting batch transcription for broadcast audio')
+        const result = await qvac.transcribe({ filePath: eventData.broadcastAudioPath })
+        const text = typeof result === 'string' ? result : (result?.text || '')
+        if (text) {
           const transcriptEvent = {
             timestamp: new Date().toISOString(),
             eventType: 'transcript',
-            description: segment.text.trim(),
+            description: text.trim(),
             channelKey: activeChannelKey
           }
           // Append the live transcript segment to Autobase so all peers receive it
           await channel.autobase.append({ type: 'event', event: transcriptEvent })
         }
       } catch (err) {
-        console.error('[Bolt Worker] transcribeStream error (non-fatal):', err.message)
+        console.error('[Bolt Worker] transcription error (non-fatal):', err.message)
       }
     })()
   }

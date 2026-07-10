@@ -23,6 +23,7 @@ let win: BrowserWindow | null = null
 let modelId: string | null = null
 let embedModelId: string | null = null // Embedding model for RAG search
 let rpc: any = null
+let workerPipe: any = null
 
 // --- Strict Instance Isolation ---
 // Parse custom user data directory for multi-peer local testing
@@ -81,7 +82,7 @@ function initP2PWorker(): void {
   const storageDir = join(app.getPath('userData'), 'holepunch-storage')
   const workerPath = join(__dirname, 'worker.js')
 
-  const worker = PearRuntime.run(workerPath, [
+  workerPipe = PearRuntime.run(workerPath, [
     storageDir,
     app.getAppPath(),
     'false',
@@ -90,7 +91,7 @@ function initP2PWorker(): void {
     appName
   ])
 
-  rpc = new HRPC(worker)
+  rpc = new HRPC(workerPipe)
 
   rpc.onWorkerReady(() => {
     console.log('P2P Worker is ready')
@@ -118,11 +119,11 @@ function initP2PWorker(): void {
     win?.webContents.send('p2p-worker-message', { type: 'download-progress', videoId, channelKey, percent, bytesReceived, totalBytes })
   })
 
-  worker.on('error', (err: Error) => {
+  workerPipe.on('error', (err: Error) => {
     console.error('Worker pipe error:', err)
   })
 
-  worker.stderr.on('data', (err: Buffer) => {
+  workerPipe.stderr?.on?.('data', (err: Buffer) => {
     console.error('P2P Worker Err:', err.toString())
   })
 }
@@ -396,6 +397,12 @@ app.on('before-quit', async (event) => {
 
   if (rpc && rpc._stream) {
     rpc._stream.destroy()
+  }
+
+  if (workerPipe && typeof workerPipe.destroy === 'function') {
+    workerPipe.destroy()
+  } else if (workerPipe && typeof workerPipe.kill === 'function') {
+    workerPipe.kill()
   }
 
   app.quit()
