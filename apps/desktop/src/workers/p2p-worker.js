@@ -82,7 +82,7 @@ Bare.on('resume', async () => {
 setInterval(() => {
   if (rpc && rpc.channelEvent) {
     try {
-      rpc.channelEvent({ eventJson: JSON.stringify({ type: 'swarm-stats', count: swarm.connections.size }) })
+      rpc.channelEvent({ type: 'swarm-stats', count: swarm.connections.size })
     } catch (e) {}
   }
 }, 2000)
@@ -284,7 +284,7 @@ async function processAutobaseNode(channelKey, channelData, msg) {
     }
   } else if (msg.type === 'event') {
     channelData.events.push(msg.event)
-    rpc.channelEvent({ eventJson: JSON.stringify({ ...msg.event, channelKey }) })
+    rpc.channelEvent({ type: 'event', channelKey, ...msg.event })
   }
 }
 
@@ -488,22 +488,17 @@ rpc.onUploadVideo(async (req) => {
 
       // ─ 1c. RAG ingest if we got a non-empty transcript ────────────────
       if (transcript) {
-        // Lazily load the GTE embedding model shared across all RAG ops
+        // Load a dedicated Embedding Model for RAG
         if (!embedModelId) {
-          console.log('[Bolt Worker] Loading embedding model for RAG...')
-          embedModelId = await qvac.loadModel({
-            modelSrc: qvac.GTE_LARGE_FP16,
-            modelType: 'embeddings'
-          })
-          console.log('[Bolt Worker] Embedding model loaded:', embedModelId)
+          console.log('[Bolt Worker] Loading Embedding model for RAG...')
+          embedModelId = await qvac.loadModel({ modelSrc: qvac.GTE_LARGE_FP16 }) 
         }
-        // Namespace the RAG workspace per channel so embeddings are isolated
-        const workspace = `channel-rag-${activeChannelKey}`
+
+        // Use native RAG workspace (do not manually namespace Corestore)
         await qvac.ragIngest({
-          modelId: embedModelId,
-          workspace,
-          documents: [transcript],
-          chunk: true
+          modelId: embedModelId, 
+          workspace: activeChannelKey, // QVAC natively isolates this workspace
+          documents: [transcript]
         })
         console.log(`[Bolt Worker] RAG ingest complete for video ${videoId} (${transcript.length} chars)`)
       }
@@ -558,30 +553,27 @@ rpc.onInjectEvent(async (req) => {
   const channel = channels.get(activeChannelKey)
   if (!channel) throw new Error('Channel not found')
   
-  const eventData = JSON.parse(req.eventJson)
+  // Access strictly typed fields from the RPC request natively
+  const { broadcastAudioPath, timestamp, eventType, description } = req 
+  const eventData = { timestamp, eventType, description, channelKey: activeChannelKey, broadcastAudioPath }
 
   // ── Task 3: Live Broadcast transcribeStream ───────────────────────────────
-  // If the event carries a broadcastAudioPath, kick off a QVAC transcribeStream
-  // session. Each speech segment is fed back as a channel event so all peers
-  // see auto-generated captions / AI context in real-time.
   if (qvac && eventData.broadcastAudioPath) {
     ;(async () => {
-      try {
-        console.log('[Bolt Worker] Starting batch transcription for broadcast audio')
-        const result = await qvac.transcribe({ filePath: eventData.broadcastAudioPath })
-        const text = typeof result === 'string' ? result : (result?.text || '')
+      console.log('[Bolt Worker] Starting streaming transcription for broadcast audio')
+      const transcriptionStream = await qvac.transcribeStream({ filePath: eventData.broadcastAudioPath })
+      
+      for await (const segment of transcriptionStream) {
+        const text = typeof segment === 'string' ? segment : (segment?.text || '')
         if (text) {
-          const transcriptEvent = {
-            timestamp: new Date().toISOString(),
-            eventType: 'transcript',
-            description: text.trim(),
-            channelKey: activeChannelKey
-          }
-          // Append the live transcript segment to Autobase so all peers receive it
-          await channel.autobase.append({ type: 'event', event: transcriptEvent })
+           const transcriptEvent = { 
+              timestamp: new Date().toISOString(), 
+              eventType: 'transcript', 
+              description: text.trim(), 
+              channelKey: activeChannelKey 
+           }
+           await channel.autobase.append({ type: 'event', event: transcriptEvent })
         }
-      } catch (err) {
-        console.error('[Bolt Worker] transcription error (non-fatal):', err.message)
       }
     })()
   }
@@ -589,7 +581,7 @@ rpc.onInjectEvent(async (req) => {
 
   await channel.autobase.append({
     type: 'event',
-    event: eventData
+    event: { timestamp, eventType, description, channelKey: activeChannelKey }
   })
 
   return { success: true }

@@ -109,7 +109,13 @@ schemaNs.register({
 
 schemaNs.register({
   name: 'inject-event-request',
-  fields: [{ name: 'eventJson', type: 'string' }]
+  fields: [
+    { name: 'channelKey', type: 'string' },
+    { name: 'timestamp', type: 'string' },
+    { name: 'eventType', type: 'string' },
+    { name: 'description', type: 'string' },
+    { name: 'broadcastAudioPath', type: 'string' }
+  ]
 })
 schemaNs.register({
   name: 'success-response',
@@ -132,7 +138,15 @@ schemaNs.register({
 // ── Server Events (Worker -> Main) ──
 schemaNs.register({
   name: 'channel-event',
-  fields: [{ name: 'eventJson', type: 'string' }]
+  fields: [
+    { name: 'type', type: 'string' },
+    { name: 'count', type: 'uint' },
+    { name: 'channelKey', type: 'string' },
+    { name: 'timestamp', type: 'string' },
+    { name: 'eventType', type: 'string' },
+    { name: 'description', type: 'string' },
+    { name: 'broadcastAudioPath', type: 'string' }
+  ]
 })
 schemaNs.register({
   name: 'upload-progress',

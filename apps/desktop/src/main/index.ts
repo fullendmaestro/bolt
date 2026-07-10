@@ -80,7 +80,7 @@ function initP2PWorker(): void {
   const appName = 'BoltSports'
   // Use the isolated app.getPath('userData') so corestore stays separated!
   const storageDir = join(app.getPath('userData'), 'holepunch-storage')
-  const workerPath = join(__dirname, 'worker.js')
+  const workerPath = join(app.getAppPath(), 'qvac', 'worker.bundle.js')
 
   workerPipe = PearRuntime.run(workerPath, [
     storageDir,
@@ -103,8 +103,8 @@ function initP2PWorker(): void {
     }
   })
 
-  rpc.onChannelEvent(({ eventJson }) => {
-    win?.webContents.send('channel-event', JSON.parse(eventJson))
+  rpc.onChannelEvent((req: any) => {
+    win?.webContents.send('channel-event', req)
   })
 
   rpc.onErrorEvent(({ message, command }) => {
@@ -125,6 +125,16 @@ function initP2PWorker(): void {
 
   workerPipe.stderr?.on?.('data', (err: Buffer) => {
     console.error('P2P Worker Err:', err.toString())
+  })
+
+  workerPipe.on('exit', (code: number, signal: string) => {
+    console.error(`[Main] P2P Worker crashed with code ${code} and signal ${signal}.`)
+    console.log(`[Main] Initiating crash recovery: restarting worker and reloading models...`)
+    // Trigger recovery sequence here: 
+    // 1. Re-initialize workerPipe
+    // 2. Re-establish HRPC
+    // 3. Re-load active models
+    initP2PWorker() 
   })
 }
 
@@ -344,8 +354,8 @@ function setupHandlers(): void {
   })
 
   // ── Event Injection Handler ───────────────────────────
-  ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'>) => {
-    await rpc.injectEvent({ channelKey: '', eventJson: JSON.stringify(eventData) })
+  ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'> & { broadcastAudioPath?: string }) => {
+    await rpc.injectEvent({ channelKey: '', ...eventData })
   })
 
   // ── Legacy P2P Send (backward compatibility) ──────────
