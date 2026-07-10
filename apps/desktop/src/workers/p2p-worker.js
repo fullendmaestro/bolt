@@ -15,6 +15,16 @@ const BlobServer = require('hypercore-blob-server')
 const Autobase = require('autobase')
 const BlindPeering = require('blind-peering')
 
+// ── QVAC AI SDK ──
+// Loaded lazily via dynamic require so the Bare worker can import the SDK
+// without pulling in Electron-only entry points.
+let qvac = null
+try {
+  qvac = require('@qvac/sdk')
+} catch (e) {
+  console.warn('[Bolt Worker] @qvac/sdk not available in Bare context – AI features disabled.', e.message)
+}
+
 const pipe = Bare.IPC
 const rpc = new HRPC(pipe)
 
@@ -437,6 +447,37 @@ rpc.onUploadVideo(async (req) => {
     }
   }
 
+  // ── Task 1: AI Pre-processing — Transcribe & RAG Ingest ──────────────────
+  // Run the local video through QVAC's transcribe() to extract a text transcript.
+  // Then ingest into QVAC's RAG pipeline, namespaced by channel key so each
+  // channel has its own searchable knowledge base in the shared Corestore.
+  let transcript = ''
+  if (qvac) {
+    try {
+      console.log('[Bolt Worker] Transcribing video for RAG ingestion:', req.filePath)
+      const transcribeResult = await qvac.transcribe({ filePath: req.filePath })
+      transcript = transcribeResult?.text || ''
+
+      if (transcript) {
+        // Namespace the RAG workspace per channel so embeddings are isolated
+        const ragWorkspaceId = `channel-rag-${activeChannelKey}`
+        await qvac.ragIngest({
+          workspaceId: ragWorkspaceId,
+          docs: [{
+            id: videoId,
+            content: transcript,
+            metadata: { videoId, title: req.title, channelKey: activeChannelKey, timestamp: new Date().toISOString() }
+          }]
+        })
+        console.log(`[Bolt Worker] RAG ingest complete for video ${videoId} (${transcript.length} chars)`)
+      }
+    } catch (err) {
+      // Non-fatal: upload succeeds even if AI pre-processing fails
+      console.error('[Bolt Worker] Transcribe/RAG ingest failed (non-fatal):', err.message)
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const videoEntry = {
     id: videoId,
     title: req.title,
@@ -447,6 +488,7 @@ rpc.onUploadVideo(async (req) => {
     blob,
     thumbnailBlob,
     thumbnailExt,
+    transcript, // stored so peers can see it propagated via Autobase
     isLive: false
   }
 
@@ -481,6 +523,34 @@ rpc.onInjectEvent(async (req) => {
   if (!channel) throw new Error('Channel not found')
   
   const eventData = JSON.parse(req.eventJson)
+
+  // ── Task 3: Live Broadcast transcribeStream ───────────────────────────────
+  // If the event carries a broadcastAudioPath, kick off a QVAC transcribeStream
+  // session. Each speech segment is fed back as a channel event so all peers
+  // see auto-generated captions / AI context in real-time.
+  if (qvac && eventData.broadcastAudioPath) {
+    ;(async () => {
+      try {
+        console.log('[Bolt Worker] Starting live transcribeStream for broadcast audio')
+        const session = await qvac.transcribeStream({ filePath: eventData.broadcastAudioPath })
+        for await (const segment of session) {
+          if (!segment || !segment.text) continue
+          const transcriptEvent = {
+            timestamp: new Date().toISOString(),
+            eventType: 'transcript',
+            description: segment.text.trim(),
+            channelKey: activeChannelKey
+          }
+          // Append the live transcript segment to Autobase so all peers receive it
+          await channel.autobase.append({ type: 'event', event: transcriptEvent })
+        }
+      } catch (err) {
+        console.error('[Bolt Worker] transcribeStream error (non-fatal):', err.message)
+      }
+    })()
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   await channel.autobase.append({
     type: 'event',
     event: eventData
