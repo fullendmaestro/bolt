@@ -22,9 +22,12 @@ let qvac = null
 let embedModelId = null       // Embedding model for RAG (GTE_LARGE_FP16)
 let transcribeModelId = null  // Transcription model for video pre-processing (PARAKEET_TDT_0_6B_V3_Q8_0)
 try {
-  qvac = require('@qvac/sdk')
+  qvac = require('@qvac/bare-sdk')
+  const { plugins } = require('@qvac/bare-sdk')
+  const parakeetPlugin = require('@qvac/bare-sdk/transcription-parakeet/plugin')
+  plugins([parakeetPlugin])
 } catch (e) {
-  console.warn('[Bolt Worker] @qvac/sdk not available in Bare context – AI features disabled.', e.message)
+  console.warn('[Bolt Worker] @qvac/bare-sdk not available in Bare context – AI features disabled.', e.message)
 }
 
 const pipe = Bare.IPC
@@ -464,8 +467,7 @@ rpc.onUploadVideo(async (req) => {
       if (!transcribeModelId) {
         console.log('[Bolt Worker] Loading Parakeet transcription model...')
         transcribeModelId = await qvac.loadModel({
-          modelSrc: qvac.PARAKEET_TDT_0_6B_V3_Q8_0,
-          modelType: 'parakeet'
+          modelSrc: qvac.PARAKEET_TDT_0_6B_V3_Q8_0
         })
         console.log('[Bolt Worker] Transcription model loaded:', transcribeModelId)
       }

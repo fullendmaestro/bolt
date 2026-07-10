@@ -135,36 +135,52 @@ function setupHandlers(): void {
   // If channelOwnerKey is provided, route the request to that peer's QVAC
   // provider node. fallbackToLocal ensures we still work if the peer is offline.
   ipcMain.handle('load-model', async (_event, channelOwnerKey?: string) => {
-    const delegateConfig = channelOwnerKey
-      ? {
-          providerPublicKey: channelOwnerKey,
-          fallbackToLocal: true,
-          timeout: 60000
-        }
-      : undefined
+    try {
+      const delegateConfig = channelOwnerKey
+        ? {
+            providerPublicKey: channelOwnerKey,
+            fallbackToLocal: true,
+            timeout: 60000
+          }
+        : undefined
 
-    modelId = await loadModel({
-      modelSrc: LLAMA_3_2_1B_INST_Q4_0,
-      modelType: 'llm',
-      delegate: delegateConfig,
-      onProgress: (progress) => {
-        console.log(progress)
-        win?.webContents.send('model-progress', progress)
+      modelId = await loadModel({
+        modelSrc: LLAMA_3_2_1B_INST_Q4_0,
+        modelType: 'llm',
+        delegate: delegateConfig,
+        onProgress: (progress) => {
+          console.log(progress)
+          win?.webContents.send('model-progress', progress)
+        }
+      })
+      return 'model loaded'
+    } catch (err: any) {
+      if (err?.code === 50206 || String(err?.code) === '50206' || err?.message?.includes('WORKER_SHUTDOWN')) {
+        console.warn('load-model aborted due to app teardown (WORKER_SHUTDOWN)')
+        return 'model load aborted'
       }
-    })
-    return 'model loaded'
+      throw err
+    }
   })
 
   // Task 3: KV Cache support — forward the kvCache flag to completion()
   // so the LLM can cache attention state across the continuous event stream.
   ipcMain.handle('infer', async (_event, history, options?: { kvCache?: boolean }) => {
-    if (!modelId) throw new Error('Model not loaded.')
+    try {
+      if (!modelId) throw new Error('Model not loaded.')
 
-    const result = completion({ modelId, history, stream: true, kvCache: options?.kvCache ?? false })
-    for await (const token of result.tokenStream) {
-      win?.webContents.send('completion-stream', token)
+      const result = completion({ modelId, history, stream: true, kvCache: options?.kvCache ?? false })
+      for await (const token of result.tokenStream) {
+        win?.webContents.send('completion-stream', token)
+      }
+      win?.webContents.send('completion-stream', '')
+    } catch (err: any) {
+      if (err?.code === 50206 || String(err?.code) === '50206' || err?.message?.includes('WORKER_SHUTDOWN')) {
+        console.warn('infer aborted due to app teardown (WORKER_SHUTDOWN)')
+        return
+      }
+      throw err
     }
-    win?.webContents.send('completion-stream', '')
   })
 
   ipcMain.handle('unload-model', async () => {
@@ -194,6 +210,10 @@ function setupHandlers(): void {
         score: (r as any).score ?? 0
       }))
     } catch (err: any) {
+      if (err?.code === 50206 || String(err?.code) === '50206' || err?.message?.includes('WORKER_SHUTDOWN')) {
+        console.warn('rag:search aborted due to app teardown (WORKER_SHUTDOWN)')
+        return []
+      }
       console.error('[RAG] ragSearch failed:', err.message)
       return []
     }
@@ -354,10 +374,31 @@ app.whenReady().then(() => {
   initP2PWorker()
 })
 
-app.on('before-quit', () => {
+let isQuitting = false
+
+app.on('before-quit', async (event) => {
+  if (isQuitting) return
+  event.preventDefault()
+  isQuitting = true
+
+  try {
+    if (modelId) {
+      await unloadModel({ modelId })
+      modelId = null
+    }
+    if (embedModelId) {
+      await unloadModel({ modelId: embedModelId })
+      embedModelId = null
+    }
+  } catch (err) {
+    console.warn('Error unloading models on teardown:', err)
+  }
+
   if (rpc && rpc._stream) {
     rpc._stream.destroy()
   }
+
+  app.quit()
 })
 
 app.on('window-all-closed', () => {

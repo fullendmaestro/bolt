@@ -18,10 +18,8 @@
     "dev:pear3": "sleep 12 && ELECTRON_RENDERER_URL=http://localhost:5173 electron . --no-sandbox --user-data-dir=./.data/pear3",
     "build": "pnpm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
-    "build:unpack": "pnpm run build && electron-builder --dir",
-    "build:win": "pnpm run build && electron-builder --win",
-    "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "package": "pnpm run build && electron-forge package",
+    "make": "pnpm run build && electron-forge make"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.14.26",
