@@ -2,8 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('qvacAPI', {
   // ── AI APIs ───────────────────────────────────────────────
-  loadModel: (channelOwnerKey?: string) => ipcRenderer.invoke('load-model', channelOwnerKey),
-  infer: (history, options?: { kvCache?: boolean }) => ipcRenderer.invoke('infer', history, options),
+  loadModel: () => ipcRenderer.invoke('load-model'),
+  infer: (history) => ipcRenderer.invoke('infer', history),
   unloadModel: () => ipcRenderer.invoke('unload-model'),
   onCompletionStream: (cb) =>
     ipcRenderer.on('completion-stream', (_event, token) => cb(token)),
@@ -11,10 +11,6 @@ contextBridge.exposeInMainWorld('qvacAPI', {
     ipcRenderer.on('model-progress', (_event, progress) => cb(progress)),
   removeModelProgressListener: () =>
     ipcRenderer.removeAllListeners('model-progress'),
-
-  // ── RAG ───────────────────────────────────────────────────
-  ragSearch: (channelKey: string, query: string) =>
-    ipcRenderer.invoke('rag:search', channelKey, query),
 
   // ── Channel Management ────────────────────────────────────
   joinChannel: (channelKey: string) => ipcRenderer.invoke('channel:join', channelKey),

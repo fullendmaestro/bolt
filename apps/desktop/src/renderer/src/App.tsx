@@ -32,16 +32,13 @@ function AppLayout() {
     }
   }, [])
 
-  // Task 2: handleLoadModel accepts an optional channelOwnerKey.
-  // When provided (delegate mode), the main process routes the loadModel
-  // request to the channel owner's QVAC provider node over P2P.
-  const handleLoadModel = async (channelOwnerKey?: string) => {
+  const handleLoadModel = async () => {
     setModelStatus('downloading')
     try {
-      await window.qvacAPI.loadModel(channelOwnerKey)
+      await window.qvacAPI.loadModel()
       setModelStatus('ready')
     } catch (error) {
-      console.error('Failed to initialize QVAC runtime:', error)
+      console.error('Failed to initialize local QVAC runtime:', error)
       setModelStatus('idle')
     }
   }

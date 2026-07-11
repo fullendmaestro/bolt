@@ -15,24 +15,6 @@ const BlobServer = require('hypercore-blob-server')
 const Autobase = require('autobase')
 const BlindPeering = require('blind-peering')
 
-// ── QVAC AI SDK ──
-// Loaded lazily via dynamic require so the Bare worker can import the SDK
-// without pulling in Electron-only entry points.
-let qvac = null
-let embedModelId = null       // Embedding model for RAG (GTE_LARGE_FP16)
-let transcribeModelId = null  // Transcription model for video pre-processing (PARAKEET_TDT_0_6B_V3_Q8_0)
-try {
-  qvac = require('@qvac/bare-sdk')
-  const { plugins } = require('@qvac/bare-sdk')
-  
-  // Dynamic import because plugin only exports 'import' condition
-  import('@qvac/bare-sdk/parakeet-transcription/plugin').then((mod) => {
-    plugins([mod.default || mod])
-  }).catch(e => console.error('Failed to load Parakeet plugin:', e))
-} catch (e) {
-  console.warn('[Bolt Worker] @qvac/bare-sdk not available in Bare context – AI features disabled.', e.message)
-}
-
 const pipe = Bare.IPC
 const rpc = new HRPC(pipe)
 
@@ -82,7 +64,7 @@ Bare.on('resume', async () => {
 setInterval(() => {
   if (rpc && rpc.channelEvent) {
     try {
-      rpc.channelEvent({ type: 'swarm-stats', count: swarm.connections.size })
+      rpc.channelEvent({ eventJson: JSON.stringify({ type: 'swarm-stats', count: swarm.connections.size }) })
     } catch (e) {}
   }
 }, 2000)
@@ -284,7 +266,7 @@ async function processAutobaseNode(channelKey, channelData, msg) {
     }
   } else if (msg.type === 'event') {
     channelData.events.push(msg.event)
-    rpc.channelEvent({ type: 'event', channelKey, ...msg.event })
+    rpc.channelEvent({ eventJson: JSON.stringify({ ...msg.event, channelKey }) })
   }
 }
 
@@ -455,60 +437,6 @@ rpc.onUploadVideo(async (req) => {
     }
   }
 
-  // ── Task 1: AI Pre-processing — Transcribe & RAG Ingest ──────────────────
-  // Run the local video through QVAC's transcribe() to extract a text transcript.
-  // Then ingest into QVAC's RAG pipeline, namespaced by channel key so each
-  // channel has its own searchable knowledge base in the shared Corestore.
-  //
-  // Key API facts (from SDK source):
-  //   transcribe({ modelId, audioChunk }) → Promise<string>  (plain string, not { text })
-  //   ragIngest({ modelId, workspace, documents: string[] })
-  let transcript = ''
-  if (qvac) {
-    try {
-      // ─ 1a. Lazily load the PARAKEET transcription model ─────────────────
-      if (!transcribeModelId) {
-        console.log('[Bolt Worker] Loading Parakeet transcription model...')
-        transcribeModelId = await qvac.loadModel({
-          modelSrc: qvac.PARAKEET_TDT_0_6B_V3_Q8_0
-        })
-        console.log('[Bolt Worker] Transcription model loaded:', transcribeModelId)
-      }
-
-      // ─ 1b. Transcribe the video file ───────────────────────────────
-      // audioChunk accepts a file path string directly; result is a plain string.
-      console.log('[Bolt Worker] Transcribing video for RAG ingestion:', req.filePath)
-      transcript = await qvac.transcribe({
-        modelId: transcribeModelId,
-        audioChunk: req.filePath  // QVAC accepts the video/audio file path directly
-      })
-      // Normalise: SDK returns a string; guard against any unexpected falsy value
-      if (typeof transcript !== 'string') transcript = String(transcript || '')
-      console.log(`[Bolt Worker] Transcription complete: ${transcript.length} chars`)
-
-      // ─ 1c. RAG ingest if we got a non-empty transcript ────────────────
-      if (transcript) {
-        // Load a dedicated Embedding Model for RAG
-        if (!embedModelId) {
-          console.log('[Bolt Worker] Loading Embedding model for RAG...')
-          embedModelId = await qvac.loadModel({ modelSrc: qvac.GTE_LARGE_FP16 }) 
-        }
-
-        // Use native RAG workspace (do not manually namespace Corestore)
-        await qvac.ragIngest({
-          modelId: embedModelId, 
-          workspace: activeChannelKey, // QVAC natively isolates this workspace
-          documents: [transcript]
-        })
-        console.log(`[Bolt Worker] RAG ingest complete for video ${videoId} (${transcript.length} chars)`)
-      }
-    } catch (err) {
-      // Non-fatal: upload succeeds even if AI pre-processing fails
-      console.error('[Bolt Worker] Transcribe/RAG ingest failed (non-fatal):', err.message)
-    }
-  }
-  // ─────────────────────────────────────────────────────────────────────────
-
   const videoEntry = {
     id: videoId,
     title: req.title,
@@ -519,7 +447,6 @@ rpc.onUploadVideo(async (req) => {
     blob,
     thumbnailBlob,
     thumbnailExt,
-    transcript, // stored so peers can see it propagated via Autobase
     isLive: false
   }
 
@@ -553,35 +480,10 @@ rpc.onInjectEvent(async (req) => {
   const channel = channels.get(activeChannelKey)
   if (!channel) throw new Error('Channel not found')
   
-  // Access strictly typed fields from the RPC request natively
-  const { broadcastAudioPath, timestamp, eventType, description } = req 
-  const eventData = { timestamp, eventType, description, channelKey: activeChannelKey, broadcastAudioPath }
-
-  // ── Task 3: Live Broadcast transcribeStream ───────────────────────────────
-  if (qvac && eventData.broadcastAudioPath) {
-    ;(async () => {
-      console.log('[Bolt Worker] Starting streaming transcription for broadcast audio')
-      const transcriptionStream = await qvac.transcribeStream({ filePath: eventData.broadcastAudioPath })
-      
-      for await (const segment of transcriptionStream) {
-        const text = typeof segment === 'string' ? segment : (segment?.text || '')
-        if (text) {
-           const transcriptEvent = { 
-              timestamp: new Date().toISOString(), 
-              eventType: 'transcript', 
-              description: text.trim(), 
-              channelKey: activeChannelKey 
-           }
-           await channel.autobase.append({ type: 'event', event: transcriptEvent })
-        }
-      }
-    })()
-  }
-  // ─────────────────────────────────────────────────────────────────────────
-
+  const eventData = JSON.parse(req.eventJson)
   await channel.autobase.append({
     type: 'event',
-    event: { timestamp, eventType, description, channelKey: activeChannelKey }
+    event: eventData
   })
 
   return { success: true }

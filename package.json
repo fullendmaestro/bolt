@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "pnpm -F desktop dev",
-    "dev:peers": "pnpm -F desktop bundle-worker && turbo run dev:pear1 dev:pear2 dev:pear3 --ui=tui",
+    "dev:peers": "turbo run dev:pear1 dev:pear2 dev:pear3 --ui=tui",
     "build": "pnpm -F desktop build",
     "preview": "pnpm -F desktop start",
     "preview:peers": "pnpm build && concurrently -c \"bgBlue.bold,bgMagenta.bold,bgYellow.bold\" -n \"SEEDER,PEER-1,PEER-2\" \"pnpm -F desktop start -- --user-data-dir=./.data/seeder\" \"pnpm -F desktop start -- --user-data-dir=./.data/peer1\" \"pnpm -F desktop start -- --user-data-dir=./.data/peer2\"",
@@ -32,8 +32,6 @@
     ]
   },
   "devDependencies": {
-    "@electron-forge/plugin-base": "^7.11.2",
-    "@qvac/cli": "^0.8.0",
     "concurrently": "^10.0.3",
     "turbo": "^2.10.4"
   }

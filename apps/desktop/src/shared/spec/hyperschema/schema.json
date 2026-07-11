@@ -255,27 +255,7 @@
       "flagsPosition": 0,
       "fields": [
         {
-          "name": "channelKey",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "timestamp",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "eventType",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "description",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "broadcastAudioPath",
+          "name": "eventJson",
           "type": "string",
           "version": 1
         }
@@ -337,37 +317,7 @@
       "flagsPosition": 0,
       "fields": [
         {
-          "name": "type",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "count",
-          "type": "uint",
-          "version": 1
-        },
-        {
-          "name": "channelKey",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "timestamp",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "eventType",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "description",
-          "type": "string",
-          "version": 1
-        },
-        {
-          "name": "broadcastAudioPath",
+          "name": "eventJson",
           "type": "string",
           "version": 1
         }

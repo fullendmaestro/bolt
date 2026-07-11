@@ -347,39 +347,22 @@ const encoding15 = {
 // @bolt/inject-event-request
 const encoding16 = {
   preencode(state, m) {
-    state.end++ // max flag is 16 so always one byte
+    state.end++ // max flag is 1 so always one byte
 
-    if (m.channelKey) c.string.preencode(state, m.channelKey)
-    if (m.timestamp) c.string.preencode(state, m.timestamp)
-    if (m.eventType) c.string.preencode(state, m.eventType)
-    if (m.description) c.string.preencode(state, m.description)
-    if (m.broadcastAudioPath) c.string.preencode(state, m.broadcastAudioPath)
+    if (m.eventJson) c.string.preencode(state, m.eventJson)
   },
   encode(state, m) {
-    const flags =
-      (m.channelKey ? 1 : 0) |
-      (m.timestamp ? 2 : 0) |
-      (m.eventType ? 4 : 0) |
-      (m.description ? 8 : 0) |
-      (m.broadcastAudioPath ? 16 : 0)
+    const flags = m.eventJson ? 1 : 0
 
     c.uint.encode(state, flags)
 
-    if (m.channelKey) c.string.encode(state, m.channelKey)
-    if (m.timestamp) c.string.encode(state, m.timestamp)
-    if (m.eventType) c.string.encode(state, m.eventType)
-    if (m.description) c.string.encode(state, m.description)
-    if (m.broadcastAudioPath) c.string.encode(state, m.broadcastAudioPath)
+    if (m.eventJson) c.string.encode(state, m.eventJson)
   },
   decode(state) {
     const flags = c.uint.decode(state)
 
     return {
-      channelKey: (flags & 1) !== 0 ? c.string.decode(state) : null,
-      timestamp: (flags & 2) !== 0 ? c.string.decode(state) : null,
-      eventType: (flags & 4) !== 0 ? c.string.decode(state) : null,
-      description: (flags & 8) !== 0 ? c.string.decode(state) : null,
-      broadcastAudioPath: (flags & 16) !== 0 ? c.string.decode(state) : null
+      eventJson: (flags & 1) !== 0 ? c.string.decode(state) : null
     }
   }
 }
@@ -440,52 +423,7 @@ const encoding19 = {
 }
 
 // @bolt/channel-event
-const encoding20 = {
-  preencode(state, m) {
-    state.end++ // max flag is 64 so always one byte
-
-    if (m.type) c.string.preencode(state, m.type)
-    if (m.count) c.uint.preencode(state, m.count)
-    if (m.channelKey) c.string.preencode(state, m.channelKey)
-    if (m.timestamp) c.string.preencode(state, m.timestamp)
-    if (m.eventType) c.string.preencode(state, m.eventType)
-    if (m.description) c.string.preencode(state, m.description)
-    if (m.broadcastAudioPath) c.string.preencode(state, m.broadcastAudioPath)
-  },
-  encode(state, m) {
-    const flags =
-      (m.type ? 1 : 0) |
-      (m.count ? 2 : 0) |
-      (m.channelKey ? 4 : 0) |
-      (m.timestamp ? 8 : 0) |
-      (m.eventType ? 16 : 0) |
-      (m.description ? 32 : 0) |
-      (m.broadcastAudioPath ? 64 : 0)
-
-    c.uint.encode(state, flags)
-
-    if (m.type) c.string.encode(state, m.type)
-    if (m.count) c.uint.encode(state, m.count)
-    if (m.channelKey) c.string.encode(state, m.channelKey)
-    if (m.timestamp) c.string.encode(state, m.timestamp)
-    if (m.eventType) c.string.encode(state, m.eventType)
-    if (m.description) c.string.encode(state, m.description)
-    if (m.broadcastAudioPath) c.string.encode(state, m.broadcastAudioPath)
-  },
-  decode(state) {
-    const flags = c.uint.decode(state)
-
-    return {
-      type: (flags & 1) !== 0 ? c.string.decode(state) : null,
-      count: (flags & 2) !== 0 ? c.uint.decode(state) : 0,
-      channelKey: (flags & 4) !== 0 ? c.string.decode(state) : null,
-      timestamp: (flags & 8) !== 0 ? c.string.decode(state) : null,
-      eventType: (flags & 16) !== 0 ? c.string.decode(state) : null,
-      description: (flags & 32) !== 0 ? c.string.decode(state) : null,
-      broadcastAudioPath: (flags & 64) !== 0 ? c.string.decode(state) : null
-    }
-  }
-}
+const encoding20 = encoding16
 
 // @bolt/upload-progress
 const encoding21 = {
