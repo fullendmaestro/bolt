@@ -1,5 +1,6 @@
-import { MessagesAnnotation, StateGraph } from "@langchain/langgraph"
+import { StateGraph } from "@langchain/langgraph"
 import { ChatOpenAI } from "@langchain/openai"
+import { StateAnnotation } from "./state"
 
 // Connect directly to QVAC's local OpenAI-compatible server
 const model = new ChatOpenAI({
@@ -11,12 +12,12 @@ const model = new ChatOpenAI({
   streaming: true,
 })
 
-const callModel = async (state: typeof MessagesAnnotation.State) => {
+const callModel = async (state: typeof StateAnnotation.State) => {
   const response = await model.invoke(state.messages)
   return { messages: [response] }
 }
 
-export const graph = new StateGraph(MessagesAnnotation)
+export const graph = new StateGraph(StateAnnotation)
   .addNode("agent", callModel)
   .addEdge("__start__", "agent")
   .addEdge("agent", "__end__")

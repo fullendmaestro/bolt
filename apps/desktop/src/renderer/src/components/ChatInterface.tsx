@@ -10,7 +10,7 @@ const client = new Client({
 
 export function ChatInterface(): React.JSX.Element {
     // Point this to the local LangGraph API server spawned by Electron
-    const assistantId = import.meta.env.VITE_LANGGRAPH_ASSISTANT_ID || 'agent'
+    const assistantId = import.meta.env.VITE_LANGGRAPH_ASSISTANT_ID || 'assistant'
     const runtime = useLangGraphRuntime({
         create: async () => {
             console.log("ChatInterface: create thread called")
@@ -27,7 +27,7 @@ export function ChatInterface(): React.JSX.Element {
             console.log("ChatInterface: stream called with messages", messages)
             const { externalId } = await initialize()
             console.log("ChatInterface: initialize complete, thread ID is", externalId)
-            
+
             try {
                 yield* client.runs.stream(externalId!, assistantId, {
                     input: { messages },
