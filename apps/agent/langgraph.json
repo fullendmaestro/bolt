@@ -1,9 +1,0 @@
-{
-  "dependencies": [
-    "."
-  ],
-  "graphs": {
-    "assistant": "./assistant/agent.ts:graph"
-  },
-  "env": ".env"
-}

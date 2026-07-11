@@ -7,7 +7,15 @@ import { ChatInterface } from '../components/ChatInterface'
 type ConnectionState = 'connecting' | 'buffering' | 'streaming' | 'error'
 type DownloadState = 'idle' | 'downloading' | 'complete'
 
-export function Watch() {
+export function Watch({
+  modelStatus,
+  modelProgress,
+  loadModel
+}: {
+  modelStatus: string
+  modelProgress: number
+  loadModel: () => void
+}) {
   const { id } = useParams()
   const location = useLocation()
   const stream = location.state?.stream
@@ -269,7 +277,12 @@ export function Watch() {
       {/* AI Assistant Sidebar */}
       <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
         <div className="sticky top-0 h-[calc(100vh-120px)] rounded-xl overflow-hidden border border-white/10 shadow-lg bg-[#0F0F0F] flex flex-col">
-          <ChatInterface />
+          <ChatInterface
+            modelStatus={modelStatus}
+            modelProgress={modelProgress}
+            loadModel={loadModel}
+            channelKey={channelKey}
+          />
         </div>
       </div>
     </div>

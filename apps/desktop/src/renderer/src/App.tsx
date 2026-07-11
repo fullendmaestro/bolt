@@ -8,6 +8,8 @@ import { Watch } from './pages/Watch'
 import { Studio } from './pages/Studio' // NEW IMPORT
 
 function AppLayout() {
+  const [modelStatus, setModelStatus] = useState<'idle' | 'downloading' | 'ready'>('idle')
+  const [modelProgress, setModelProgress] = useState(0)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true)
 
   const location = useLocation()
@@ -19,6 +21,28 @@ function AppLayout() {
     setIsSidebarExpanded(!isWatchOrStudio)
   }, [location.pathname])
 
+  // Listen to model download progress
+  useEffect(() => {
+    window.qvacAPI.onModelProgress((progress) => {
+      setModelProgress(progress.percentage || 0)
+    })
+    return () => {
+      window.qvacAPI.removeModelProgressListener()
+      window.qvacAPI.unloadModel().catch(console.error)
+    }
+  }, [])
+
+  const handleLoadModel = async () => {
+    setModelStatus('downloading')
+    try {
+      await window.qvacAPI.loadModel()
+      setModelStatus('ready')
+    } catch (error) {
+      console.error('Failed to initialize local QVAC runtime:', error)
+      setModelStatus('idle')
+    }
+  }
+
   return (
     <div className="flex h-screen w-screen flex-col bg-[#0F0F0F] text-[#F1F1F1] font-sans overflow-hidden antialiased selection:bg-neutral-800">
       <Header onMenuClick={() => setIsSidebarExpanded(!isSidebarExpanded)} />
@@ -29,7 +53,7 @@ function AppLayout() {
         <main className="flex-1 overflow-y-auto bg-[#0F0F0F] scrollbar-thin scrollbar-thumb-neutral-800">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/watch/:id" element={<Watch />} />
+            <Route path="/watch/:id" element={<Watch modelStatus={modelStatus} modelProgress={modelProgress} loadModel={handleLoadModel} />} />
             <Route path="/studio" element={<Studio />} /> {/* NEW ROUTE */}
           </Routes>
         </main>
