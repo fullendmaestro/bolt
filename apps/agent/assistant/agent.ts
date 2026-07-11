@@ -1,24 +1,30 @@
-import { StateGraph } from "@langchain/langgraph"
-import { ChatOpenAI } from "@langchain/openai"
-import { StateAnnotation } from "./state"
 
-// Connect directly to QVAC's local OpenAI-compatible server
+import { ChatOpenAI } from "@langchain/openai"
+import { createAgent } from "langchain";
+import { TOOLS } from "./tools.js";
+import { SYSTEM_PROMPT } from "./prompts.js";
+
 const model = new ChatOpenAI({
   modelName: "local-model",
-  openAIApiKey: "not-needed", 
   configuration: {
-    baseURL: "http://127.0.0.1:8080/v1", // Must match the port the Electron app starts QVAC on
+    baseURL: "http://127.0.0.1:8080/v1", // Must match your Electron app port
+    apiKey: "not-needed",               // Pass the dummy key here
   },
   streaming: true,
 })
 
-const callModel = async (state: typeof StateAnnotation.State) => {
-  const response = await model.invoke(state.messages)
-  return { messages: [response] }
-}
-
-export const graph = new StateGraph(StateAnnotation)
-  .addNode("agent", callModel)
-  .addEdge("__start__", "agent")
-  .addEdge("agent", "__end__")
-  .compile()
+export const agent = createAgent({
+  model: model,
+  tools: TOOLS,
+  systemPrompt: SYSTEM_PROMPT,
+  // Optional: Add middleware for advanced customization
+  // middleware: [
+  //   summarizationMiddleware({
+  //     model: "anthropic:claude-haiku-4-5",
+  //     trigger: { tokens: 4000 },
+  //   }),
+  //   humanInTheLoopMiddleware({
+  //     interruptOn: { sensitive_tool: { allowedDecisions: ["approve", "reject"] } },
+  //   }),
+  // ],
+});
