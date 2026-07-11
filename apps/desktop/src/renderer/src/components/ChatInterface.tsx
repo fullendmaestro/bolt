@@ -9,16 +9,17 @@ interface ChatInterfaceProps {
     modelProgress: number
     loadModel: () => void
     channelKey?: string | null
+    currentVideoWorkspaceId?: string
 }
 
-export function ChatInterface({ modelStatus, modelProgress, loadModel, channelKey }: ChatInterfaceProps): React.JSX.Element {
+export function ChatInterface({ modelStatus, modelProgress, loadModel, channelKey, currentVideoWorkspaceId }: ChatInterfaceProps): React.JSX.Element {
     // Accumulate channel events for AI context injection
     const channelEventsRef = useRef<ChannelEvent[]>([])
 
     // Create the adapter with a ref to the events buffer
     const adapter = React.useMemo(
-        () => createQvacModelAdapter(channelEventsRef),
-        []
+        () => createQvacModelAdapter(channelEventsRef, currentVideoWorkspaceId),
+        [currentVideoWorkspaceId]
     )
 
     const runtime = useLocalRuntime(adapter)

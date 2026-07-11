@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "schema": [
     {
       "id": 0,
@@ -188,6 +188,19 @@
         "send": true
       },
       "version": 1
+    },
+    {
+      "id": 11,
+      "name": "@bolt/ragQuery",
+      "request": {
+        "name": "@bolt/rag-query-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/rag-query-response",
+        "stream": false
+      },
+      "version": 2
     }
   ]
 }

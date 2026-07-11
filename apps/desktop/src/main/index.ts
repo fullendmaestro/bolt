@@ -139,10 +139,10 @@ function setupHandlers(): void {
     return 'model loaded'
   })
 
-  ipcMain.handle('infer', async (_event, history) => {
+  ipcMain.handle('infer', async (_event, history, options = {}) => {
     if (!modelId) throw new Error('Model not loaded.')
 
-    const result = completion({ modelId, history, stream: true })
+    const result = completion({ modelId, history, stream: true, ...options })
     for await (const token of result.tokenStream) {
       win?.webContents.send('completion-stream', token)
     }
@@ -154,6 +154,11 @@ function setupHandlers(): void {
     await unloadModel({ modelId })
     modelId = null
     return 'model unloaded'
+  })
+
+  ipcMain.handle('rag:query', async (_event, workspaceId: string, query: string) => {
+    const res = await rpc.ragQuery({ workspaceId, query })
+    return JSON.parse(res.resultsJson)
   })
 
   // ── Channel Subscription Handlers ─────────────────────

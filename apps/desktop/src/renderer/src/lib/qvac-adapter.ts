@@ -6,7 +6,8 @@ import type { ChannelEvent } from "../../../shared/types"
  * The channelEventsRef is a mutable ref that accumulates events from the P2P worker.
  */
 export function createQvacModelAdapter(
-    channelEventsRef: React.RefObject<ChannelEvent[]>
+    channelEventsRef: React.RefObject<ChannelEvent[]>,
+    currentVideoWorkspaceId?: string
 ): ChatModelAdapter {
     return {
         async *run({ messages, abortSignal }) {
@@ -20,8 +21,22 @@ export function createQvacModelAdapter(
                 return { role: msg.role, content: textContent }
             })
 
+            const latestUserMessage = history.filter(m => m.role === 'user').pop()?.content || ""
+
             // 2. Build system prompt with channel event context
             let systemPrompt = "You are a helpful sports AI assistant for the Bolt P2P streaming platform. You help users with sports analysis, commentary, and questions about what's happening in the stream."
+
+            if (currentVideoWorkspaceId && latestUserMessage) {
+                try {
+                    const ragResults = await window.qvacAPI.ragQuery(currentVideoWorkspaceId, latestUserMessage)
+                    if (ragResults && ragResults.length > 0) {
+                        const ragContext = ragResults.map((r: any) => r.content).join("\n\n")
+                        systemPrompt += `\n\n--- VIDEO TRANSCRIPT CONTEXT ---\n${ragContext}\n--- END TRANSCRIPT ---\n\nUse this context to answer questions about the video.`
+                    }
+                } catch (err) {
+                    console.error("RAG Query failed:", err)
+                }
+            }
 
             const events = channelEventsRef.current || []
             if (events.length > 0) {
@@ -54,7 +69,7 @@ export function createQvacModelAdapter(
             })
 
             // 4. Trigger the main process inference
-            window.qvacAPI.infer(history)
+            window.qvacAPI.infer(history, { kvCache: true })
 
             // FIX: Accumulate the tokens. assistant-ui expects the full message state, not deltas.
             let accumulatedText = ""

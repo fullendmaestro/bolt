@@ -282,6 +282,7 @@ export function Watch({
             modelProgress={modelProgress}
             loadModel={loadModel}
             channelKey={channelKey}
+            currentVideoWorkspaceId={videoId ? `rag-${videoId}` : undefined}
           />
         </div>
       </div>
