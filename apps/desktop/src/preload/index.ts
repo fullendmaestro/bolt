@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   selectAndUploadVideo: (title: string, thumbnailPath?: string) =>
     ipcRenderer.invoke('video:select-and-upload', title, thumbnailPath),
   getUploads: (channelKey?: string) => ipcRenderer.invoke('uploads:get', channelKey),
+  getVideoStoreId: (videoId: string) => ipcRenderer.invoke('video:get-store-id', videoId),
 
   // ── Streaming ─────────────────────────────────────────────
   getStreamUrl: (channelKey: string, videoId: string) =>

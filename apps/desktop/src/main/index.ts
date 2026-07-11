@@ -3,6 +3,7 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { Client } from '@langchain/langgraph-sdk'
 
 import Store from 'electron-store'
 import type { ChannelEvent } from '../shared/types'
@@ -33,13 +34,15 @@ interface StoreSchema {
   joinedChannels: string[]
   ownChannelKey: string | null
   ownedChannels: string[]
+  videoStoreIds: Record<string, string>
 }
 
 const localStore = new Store<StoreSchema>({
   defaults: {
     joinedChannels: [],
     ownChannelKey: null,
-    ownedChannels: []
+    ownedChannels: [],
+    videoStoreIds: {}
   }
 })
 
@@ -210,12 +213,46 @@ function setupHandlers(): void {
       duration: '0:00',
       thumbnailPath: thumbnailPath || '',
       channelKey: ''
-    }).then((res) => {
-      win?.webContents.send('p2p-worker-message', { type: 'upload-complete', video: JSON.parse(res.videoJson) })
-    }).catch((err) => {
+    }).then(async (res: any) => {
+      const video = JSON.parse(res.videoJson)
+      win?.webContents.send('p2p-worker-message', { type: 'upload-complete', video })
+
+      // Trigger AI Ingestion
+      try {
+        console.log(`[AI] Triggering ingestion for video ${video.id}`)
+        const client = new Client({ apiUrl: 'http://localhost:3000' })
+        
+        // Wait for the analysis graph to complete and return its final state
+        const analysisResult = await client.runs.wait(null, "analysis", {
+          input: {
+            videoId: video.id,
+            videoFilePath: filePath,
+            videoTitle: video.title
+          }
+        })
+        
+        const vectorStoreId = (analysisResult as any)?.vectorStoreId ?? (analysisResult as any)?.values?.vectorStoreId
+        if (vectorStoreId) {
+           const stores = localStore.get('videoStoreIds', {})
+           stores[video.id] = vectorStoreId
+           localStore.set('videoStoreIds', stores)
+           console.log(`[AI] Ingestion complete. Saved store ID for ${video.id}: ${vectorStoreId}`)
+        } else {
+           console.warn(`[AI] Analysis finished but no vectorStoreId found in output.`, analysisResult)
+        }
+      } catch (err) {
+        console.error(`[AI] Ingestion failed for video ${video.id}:`, err)
+      }
+
+    }).catch((err: any) => {
       win?.webContents.send('p2p-worker-message', { type: 'error', message: err.message, command: 'upload-video' })
     })
     return { canceled: false, filePath }
+  })
+
+  ipcMain.handle('video:get-store-id', async (_event, videoId: string) => {
+    const stores = localStore.get('videoStoreIds', {})
+    return stores[videoId] || null
   })
 
   ipcMain.handle('uploads:get', async (_event, channelKey?: string) => {

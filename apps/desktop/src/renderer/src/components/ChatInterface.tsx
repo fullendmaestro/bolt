@@ -8,7 +8,17 @@ const client = new Client({
     apiUrl: import.meta.env.VITE_LANGGRAPH_API_URL || 'http://localhost:3000'
 })
 
-export function ChatInterface(): React.JSX.Element {
+export interface CurrentVideo {
+    videoId: string;
+    videoTitle?: string;
+    vectorStoreId: string;
+}
+
+export interface ChatInterfaceProps {
+    currentVideo?: CurrentVideo | null;
+}
+
+export function ChatInterface({ currentVideo }: ChatInterfaceProps): React.JSX.Element {
     // Point this to the local LangGraph API server spawned by Electron
     const assistantId = import.meta.env.VITE_LANGGRAPH_ASSISTANT_ID || 'assistant'
     const runtime = useLangGraphRuntime({
@@ -30,7 +40,7 @@ export function ChatInterface(): React.JSX.Element {
 
             try {
                 yield* client.runs.stream(externalId!, assistantId, {
-                    input: { messages },
+                    input: { messages, currentVideo },
                     streamMode: "messages",
                     ...config,
                 })

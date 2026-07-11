@@ -25,6 +25,7 @@ declare global {
       // Upload / Studio
       selectAndUploadVideo: (title: string, thumbnailPath?: string) => Promise<{ canceled: boolean; filePath?: string }>
       getUploads: (channelKey?: string) => Promise<void>
+      getVideoStoreId: (videoId: string) => Promise<string | null>
 
       // Streaming
       getStreamUrl: (channelKey: string, videoId: string) => Promise<void>
