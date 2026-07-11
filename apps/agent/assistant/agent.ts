@@ -19,6 +19,7 @@
 import { createAgent, createMiddleware } from "langchain";
 import { ChatOpenAI } from "@langchain/openai";
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
+import { SystemMessage, ToolMessage } from "@langchain/core/messages";
 import { TOOLS, searchVideoContext } from "./tools.js";
 import { buildSystemPrompt } from "./prompts.js";
 import type { CurrentVideo } from "./state.js";
@@ -71,24 +72,14 @@ const videoContextMiddleware = createMiddleware({
    * video context from state. This ensures the prompt stays fresh even if
    * `currentVideo` changes between turns.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   beforeModel: async (request: any) => {
     const currentVideo = request.state?.currentVideo as CurrentVideo | null;
     const systemPrompt = buildSystemPrompt(currentVideo);
 
-    // Replace or prepend the system message in the messages array.
-    const messages = (request.messages ?? request.state?.messages ?? []) as Array<{
-      _getType?: () => string;
-      role?: string;
-      content: string;
-    }>;
-
-    const nonSystem = messages.filter(
-      (m) => m._getType?.() !== "system" && m.role !== "system"
-    );
-
+    // Replace the system message by returning a new one with a fixed ID.
+    // The MessagesAnnotation reducer will overwrite the existing message with this ID.
     return {
-      messages: [{ role: "system", content: systemPrompt }, ...nonSystem],
+      messages: [new SystemMessage({ content: systemPrompt, id: "system-prompt" })],
     };
   },
 
@@ -97,7 +88,6 @@ const videoContextMiddleware = createMiddleware({
    * The LLM-facing tool schema only has `query` — `vectorStoreId` is
    * transparently injected here from the graph state.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wrapToolCall: async (request: any, handler: (req: any) => Promise<any>) => {
     const currentVideo = request.state?.currentVideo as CurrentVideo | null;
 
@@ -107,11 +97,12 @@ const videoContextMiddleware = createMiddleware({
       const toolResult = await searchVideoContext.invoke(request.toolCall.args, {
         configurable: { currentVideo },
       });
-      // Return the result in the shape the handler would have returned.
-      return {
-        ...request,
-        toolCallResult: typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult),
-      };
+      // Return the result as a ToolMessage (expected by wrapToolCall)
+      return new ToolMessage({
+        content: typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult),
+        tool_call_id: request.toolCall.id,
+        name: request.toolCall.name,
+      });
     }
 
     // For all other tools, delegate to the default handler.
@@ -126,7 +117,7 @@ export const agent = createAgent({
   model,
   tools: TOOLS,
   systemPrompt: buildSystemPrompt(null), // Default prompt; overridden by middleware
-  stateSchema: StateAnnotation,
+  stateSchema: StateAnnotation as any,
   middleware: [videoContextMiddleware],
 });
 
