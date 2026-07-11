@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "pnpm -F desktop dev",
+    "dev": "turbo run dev dev:qvac --ui=tui",
+    "dev:qvac": "qvac serve openai --port 8080",
     "dev:peers": "turbo run dev:pear1 dev:pear2 dev:pear3 --ui=tui",
     "build": "pnpm -F desktop build",
     "preview": "pnpm -F desktop start",
