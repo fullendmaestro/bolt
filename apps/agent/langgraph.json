@@ -3,7 +3,8 @@
     "."
   ],
   "graphs": {
-    "assistant": "./assistant/agent.ts:agent"
+    "assistant": "./assistant/agent.ts:graph",
+    "analysis": "./analysis/index.ts:analysisGraph"
   },
   "env": ".env"
 }
