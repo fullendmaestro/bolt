@@ -1,0 +1,9 @@
+{
+  "serve": {
+    "models": {
+      "local-model": {
+        "model": "LLAMA_3_2_1B_INST_Q4_0"
+      }
+    }
+  }
+}

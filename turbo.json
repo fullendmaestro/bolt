@@ -1,6 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
+    "dev": {
+      "persistent": true,
+      "cache": false
+    },
+    "//#dev:qvac": {
+      "persistent": true,
+      "cache": false
+    },
     "dev:pear1": {
       "persistent": true,
       "cache": false

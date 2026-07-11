@@ -3,12 +3,7 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import {
-  LLAMA_3_2_1B_INST_Q4_0,
-  loadModel,
-  unloadModel,
-  completion
-} from '@qvac/sdk'
+
 import Store from 'electron-store'
 import type { ChannelEvent } from '../shared/types'
 const PearRuntime = require('pear-runtime')
@@ -18,7 +13,6 @@ app.commandLine.appendSwitch('no-sandbox')
 
 // ── State ──────────────────────────────────────────────────
 let win: BrowserWindow | null = null
-let modelId: string | null = null
 let rpc: any = null
 
 // --- Strict Instance Isolation ---
@@ -63,6 +57,8 @@ function createWindow(): void {
   })
 
   win.on('ready-to-show', () => win!.show())
+
+  win.webContents.openDevTools()
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -127,39 +123,7 @@ function initP2PWorker(): void {
 // ── IPC Handlers ───────────────────────────────────────────
 function setupHandlers(): void {
   // ── QVAC AI Handlers ──────────────────────────────────
-  ipcMain.handle('load-model', async () => {
-    modelId = await loadModel({
-      modelSrc: LLAMA_3_2_1B_INST_Q4_0,
-      modelType: 'llm',
-      onProgress: (progress) => {
-        console.log(progress)
-        win?.webContents.send('model-progress', progress)
-      }
-    })
-    return 'model loaded'
-  })
-
-  ipcMain.handle('infer', async (_event, history, options = {}) => {
-    if (!modelId) throw new Error('Model not loaded.')
-
-    const result = completion({ modelId, history, stream: true, ...options })
-    for await (const token of result.tokenStream) {
-      win?.webContents.send('completion-stream', token)
-    }
-    win?.webContents.send('completion-stream', '')
-  })
-
-  ipcMain.handle('unload-model', async () => {
-    if (!modelId) throw new Error('Model not loaded.')
-    await unloadModel({ modelId })
-    modelId = null
-    return 'model unloaded'
-  })
-
-  ipcMain.handle('rag:query', async (_event, workspaceId: string, query: string) => {
-    const res = await rpc.ragQuery({ workspaceId, query })
-    return JSON.parse(res.resultsJson)
-  })
+  // Removed local QVAC AI IPC handlers in favor of standalone LangGraph service.
 
   // ── Channel Subscription Handlers ─────────────────────
   ipcMain.handle('channel:join', async (_event, channelKey: string) => {
@@ -273,7 +237,7 @@ function setupHandlers(): void {
       filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
     })
     if (result.canceled || !result.filePath) return { canceled: true }
-    
+
     rpc.downloadVideo({ channelKey, videoId, destinationPath: result.filePath })
       .then((res) => {
         win?.webContents.send('p2p-worker-message', { type: 'download-complete', videoId, channelKey, destinationPath: res.destinationPath })
@@ -295,6 +259,43 @@ function setupHandlers(): void {
   })
 }
 
+// ── AI Agent Server Management ─────────────────────────────
+let langGraphServerProcess: any = null
+let qvacServerProcess: any = null
+
+function initAIAgentServer(): void {
+  if (!app.isPackaged) {
+    console.log('Running in development mode. QVAC and Agent servers should be started externally via Turbo.')
+    return
+  }
+
+  const { spawn } = require('child_process')
+
+  // Start QVAC OpenAI-compatible server on port 8080
+  console.log('Starting QVAC server...')
+  qvacServerProcess = spawn('npx', ['qvac', 'serve', '--port', '8080'], {
+    shell: true,
+    stdio: 'pipe'
+  })
+
+  qvacServerProcess.stdout.on('data', (data: Buffer) => console.log(`[QVAC] ${data.toString()}`))
+  qvacServerProcess.stderr.on('data', (data: Buffer) => console.error(`[QVAC ERR] ${data.toString()}`))
+
+  // Start Standalone LangGraph Agent on port 3000
+  console.log('Starting LangGraph Agent API...')
+  const agentPath = app.isPackaged
+    ? join(process.resourcesPath, 'app.asar.unpacked/agent/server.ts')
+    : join(app.getAppPath(), '../agent/server.ts')
+
+  langGraphServerProcess = spawn('npx', ['tsx', agentPath], {
+    shell: true,
+    stdio: 'pipe'
+  })
+
+  langGraphServerProcess.stdout.on('data', (data: Buffer) => console.log(`[Agent] ${data.toString()}`))
+  langGraphServerProcess.stderr.on('data', (data: Buffer) => console.error(`[Agent ERR] ${data.toString()}`))
+}
+
 // ── App Lifecycle ──────────────────────────────────────────
 app.whenReady().then(() => {
   protocol.handle('local-asset', (request) => {
@@ -314,11 +315,22 @@ app.whenReady().then(() => {
   createWindow()
   setupHandlers()
   initP2PWorker()
+  initAIAgentServer()
 })
 
 app.on('before-quit', () => {
   if (rpc && rpc._stream) {
     rpc._stream.destroy()
+  }
+
+  if (langGraphServerProcess) {
+    console.log('Killing LangGraph Server Process...')
+    langGraphServerProcess.kill()
+  }
+
+  if (qvacServerProcess) {
+    console.log('Killing QVAC Server Process...')
+    qvacServerProcess.kill()
   }
 })
 

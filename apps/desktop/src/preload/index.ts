@@ -1,18 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('qvacAPI', {
-  // ── AI APIs ───────────────────────────────────────────────
-  loadModel: () => ipcRenderer.invoke('load-model'),
-  infer: (history, options) => ipcRenderer.invoke('infer', history, options),
-  unloadModel: () => ipcRenderer.invoke('unload-model'),
-  onCompletionStream: (cb) =>
-    ipcRenderer.on('completion-stream', (_event, token) => cb(token)),
-  onModelProgress: (cb) =>
-    ipcRenderer.on('model-progress', (_event, progress) => cb(progress)),
-  removeModelProgressListener: () =>
-    ipcRenderer.removeAllListeners('model-progress'),
-  ragQuery: (workspaceId: string, query: string) => ipcRenderer.invoke('rag:query', workspaceId, query),
-
   // ── Channel Management ────────────────────────────────────
   joinChannel: (channelKey: string) => ipcRenderer.invoke('channel:join', channelKey),
   leaveChannel: (channelKey: string) => ipcRenderer.invoke('channel:leave', channelKey),

@@ -15,18 +15,6 @@ const BlobServer = require('hypercore-blob-server')
 const Autobase = require('autobase')
 const BlindPeering = require('blind-peering')
 
-const {
-  loadModel,
-  transcribe,
-  ragIngest,
-  ragSearch,
-  PARAKEET_TDT_ENCODER_INT8,
-  PARAKEET_TDT_DECODER_INT8,
-  PARAKEET_TDT_VOCAB,
-  PARAKEET_TDT_PREPROCESSOR_INT8,
-  GTE_LARGE_FP16
-} = require('@qvac/bare-sdk')
-
 const pipe = Bare.IPC
 const rpc = new HRPC(pipe)
 
@@ -46,8 +34,6 @@ const pear = new PearRuntime({ ...updaterConfig, swarm, store })
 // ── State ──
 let blobServer = null
 let STREAM_PORT = 0
-let transcribeModelId = null
-let embedModelId = null
 const channels = new Map() // channelKey (hex) -> { baseCore, autobase, blobsCore, blobs, metadata, videos, events }
 const ownedChannels = new Set()
 
@@ -55,7 +41,7 @@ const ownedChannels = new Set()
 // For testing, we connect to a local blind-peer-cli if it exists.
 // We use a dummy key here or pass it in. If none, blind-peering just stays inactive.
 const relayKey = (typeof Bare !== 'undefined' && Bare.env && Bare.env.BLIND_PEER_KEY) || '0000000000000000000000000000000000000000000000000000000000000000'
-const blindPeers = [b4a.from(relayKey, 'hex')]
+const blindPeers = [ b4a.from(relayKey, 'hex') ] 
 const blinds = new BlindPeering(swarm, blindPeers)
 
 // ── Swarm ──
@@ -79,7 +65,7 @@ setInterval(() => {
   if (rpc && rpc.channelEvent) {
     try {
       rpc.channelEvent({ eventJson: JSON.stringify({ type: 'swarm-stats', count: swarm.connections.size }) })
-    } catch (e) { }
+    } catch (e) {}
   }
 }, 2000)
 
@@ -136,7 +122,7 @@ rpc.onInitChannel(async (req) => {
   const blobsCore = store.namespace(channelNs).get({ name: 'channel-blobs' })
   await blobsCore.ready()
 
-  const autobase = new Autobase(store, baseCore.key, {
+  const autobase = new Autobase(store, baseCore.key, { 
     valueEncoding: 'json',
     open: (viewStore) => viewStore.get({ name: 'channel-view', valueEncoding: 'json' }),
     apply: async (nodes, view) => {
@@ -217,8 +203,8 @@ rpc.onJoinChannel(async (req) => {
 
   const baseCore = store.get({ key: b4a.from(channelKey, 'hex') })
   await baseCore.ready()
-
-  const autobase = new Autobase(store, baseCore.key, {
+  
+  const autobase = new Autobase(store, baseCore.key, { 
     valueEncoding: 'json',
     open: (viewStore) => viewStore.get({ name: 'channel-view', valueEncoding: 'json' }),
     apply: async (nodes, view) => {
@@ -245,7 +231,7 @@ rpc.onJoinChannel(async (req) => {
 
   const stream = autobase.view.createReadStream({ live: true })
   stream.on('data', (msg) => processAutobaseNode(channelKey, channelData, msg))
-
+  
   autobase.update()
 
   return { channelKey }
@@ -267,10 +253,10 @@ async function processAutobaseNode(channelKey, channelData, msg) {
       channelData.blobsCore = store.get({ key: blobsCoreKey })
       await channelData.blobsCore.ready()
       channelData.blobs = new Hyperblobs(channelData.blobsCore)
-
+      
       // Join the swarm to find peers hosting the media
       swarm.join(channelData.blobsCore.discoveryKey, { client: true, server: false })
-
+      
       // Keep blobs available if blind peering is active
       if (typeof blinds !== 'undefined') blinds.addCore(channelData.blobsCore)
     }
@@ -304,9 +290,9 @@ rpc.onGetFeed(async () => {
     // 1. Format the Channel Avatar
     let channelAvatar = channel.metadata.avatarPath || ''
     if (channel.blobsCore && channel.metadata.avatarBlob) {
-      channelAvatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), {
-        blob: channel.metadata.avatarBlob,
-        type: getMimeType('dummy' + channel.metadata.avatarExt)
+      channelAvatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { 
+        blob: channel.metadata.avatarBlob, 
+        type: getMimeType('dummy' + channel.metadata.avatarExt) 
       })
     }
 
@@ -314,12 +300,12 @@ rpc.onGetFeed(async () => {
     for (const v of channel.videos) {
       let thumbnailPath = v.thumbnailPath || ''
       if (channel.blobsCore && v.thumbnailBlob) {
-        thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), {
-          blob: v.thumbnailBlob,
-          type: getMimeType('dummy' + v.thumbnailExt)
+        thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { 
+          blob: v.thumbnailBlob, 
+          type: getMimeType('dummy' + v.thumbnailExt) 
         })
       }
-
+      
       const safeVideo = { ...v }
       delete safeVideo.blob
       delete safeVideo.thumbnailBlob
@@ -333,10 +319,10 @@ rpc.onGetFeed(async () => {
       })
     }
   }
-
+  
   // Sort from newest to oldest
   items.sort((a, b) => new Date(b.video.timestamp).getTime() - new Date(a.video.timestamp).getTime())
-
+  
   return { itemsJson: JSON.stringify(items) }
 })
 
@@ -404,21 +390,21 @@ rpc.onUploadVideo(async (req) => {
   if (!activeChannelKey) {
     throw new Error('Channel not initialized')
   }
-
+  
   const channel = channels.get(activeChannelKey)
   if (!channel) throw new Error('Channel not found')
   const videoId = b4a.toString(crypto.randomBytes(8), 'hex')
 
   const rs = fs.createReadStream(req.filePath)
   const ws = channel.blobs.createWriteStream()
-
+  
   const totalBytes = fs.statSync(req.filePath).size
   let uploadedBytes = 0
 
   rs.on('data', chunk => {
     uploadedBytes += chunk.length
-    rpc.uploadProgress({
-      videoId,
+    rpc.uploadProgress({ 
+      videoId, 
       percent: Math.round((uploadedBytes / totalBytes) * 100),
       bytesReceived: uploadedBytes,
       totalBytes
@@ -451,42 +437,6 @@ rpc.onUploadVideo(async (req) => {
     }
   }
 
-  const workspaceId = `rag-${videoId}`
-
-  try {
-    if (!transcribeModelId) {
-      transcribeModelId = await loadModel({
-        modelType: "parakeet",
-        modelSrc: PARAKEET_TDT_ENCODER_INT8,
-        modelConfig: {
-          parakeetEncoderSrc: PARAKEET_TDT_ENCODER_INT8,
-          parakeetDecoderSrc: PARAKEET_TDT_DECODER_INT8,
-          parakeetVocabSrc: PARAKEET_TDT_VOCAB,
-          parakeetPreprocessorSrc: PARAKEET_TDT_PREPROCESSOR_INT8,
-        },
-      })
-    }
-    if (!embedModelId) {
-      embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16 })
-    }
-
-    const transcriptRes = await transcribe({
-      modelId: transcribeModelId,
-      audioChunk: { type: 'filePath', value: req.filePath }
-    })
-
-    if (transcriptRes.text) {
-      await ragIngest({
-        workspace: workspaceId,
-        modelId: embedModelId,
-        documents: [transcriptRes.text],
-        chunk: true
-      })
-    }
-  } catch (err) {
-    console.error('RAG ingest failed during upload:', err)
-  }
-
   const videoEntry = {
     id: videoId,
     title: req.title,
@@ -497,7 +447,6 @@ rpc.onUploadVideo(async (req) => {
     blob,
     thumbnailBlob,
     thumbnailExt,
-    workspaceId,
     isLive: false
   }
 
@@ -513,24 +462,24 @@ rpc.onStartStream(async (req) => {
   const { channelKey, videoId } = req
   const channel = channels.get(channelKey)
   if (!channel) throw new Error('Channel not found')
-
+  
   const video = channel.videos.find(v => v.id === videoId)
   if (!video) throw new Error('Video not found')
 
   if (!channel.blobsCore) throw new Error('Blobs core not ready')
 
   const link = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: video.blob, type: getMimeType(video.filename) })
-
+  
   return { url: link, channelKey, videoId }
 })
 
 rpc.onInjectEvent(async (req) => {
   const activeChannelKey = req.channelKey || Array.from(ownedChannels).pop()
   if (!activeChannelKey) throw new Error('Channel not initialized')
-
+  
   const channel = channels.get(activeChannelKey)
   if (!channel) throw new Error('Channel not found')
-
+  
   const eventData = JSON.parse(req.eventJson)
   await channel.autobase.append({
     type: 'event',
@@ -544,7 +493,7 @@ rpc.onDownloadVideo(async (req) => {
   const { channelKey, videoId, destinationPath } = req
   const channel = channels.get(channelKey)
   if (!channel) throw new Error('Channel not found')
-
+  
   const video = channel.videos.find(v => v.id === videoId)
   if (!video) throw new Error('Video not found')
 
@@ -569,19 +518,6 @@ rpc.onDownloadVideo(async (req) => {
   return { destinationPath }
 })
 
-rpc.onRagQuery(async (req) => {
-  const { workspaceId, query } = req
-  if (!embedModelId) {
-    embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16 })
-  }
-  const res = await ragSearch({
-    workspace: workspaceId,
-    modelId: embedModelId,
-    query
-  })
-  return { resultsJson: JSON.stringify(res.results || []) }
-})
-
 // ── Graceful Shutdown ──
 goodbye(async () => {
   if (blobServer) await blobServer.close()
@@ -597,42 +533,3 @@ startBlobServer().then(() => {
   console.error('Failed to start worker server:', err)
   rpc.workerReady({})
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

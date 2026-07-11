@@ -1,0 +1,21 @@
+{
+  "name": "agent",
+  "version": "1.0.0",
+  "description": "Standalone LangGraph Agent",
+  "main": "agent.ts",
+  "scripts": {
+    "dev": "langgraphjs dev --port 3000",
+    "start": "langgraphjs up"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.2",
+    "@langchain/langgraph": "^1.4.7",
+    "@langchain/openai": "^0.3.11",
+    "langchain": "^1.5.3",
+    "tsx": "^4.19.1",
+    "typescript": "^5.5.4"
+  },
+  "devDependencies": {
+    "@langchain/langgraph-cli": "^1.4.2"
+  }
+}
