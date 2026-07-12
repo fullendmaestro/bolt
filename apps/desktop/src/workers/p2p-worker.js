@@ -489,28 +489,27 @@ rpc.onUploadVideo(async (req) => {
 
   try {
     if (!transcribeModelId) {
-      transcribeModelId = await loadModel({
-        modelType: "parakeet",
-        modelSrc: PARAKEET_TDT_0_6B_V3_Q8_0,
-      })
+      transcribeModelId = await loadModel({ modelType: "parakeet", modelSrc: PARAKEET_TDT_0_6B_V3_Q8_0, })
     }
     if (!embedModelId) {
       embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16 })
     }
 
-    const transcriptRes = await transcribe({
+    const audioBuffer = fs.readFileSync(req.filePath)
+
+    const transcriptText = await transcribe({
       modelId: transcribeModelId,
-      audioChunk: { type: 'filePath', value: req.filePath }
+      audioChunk: audioBuffer
     })
 
-    if (transcriptRes.text) {
-      await ragIngest({
-        workspace: workspaceId,
-        modelId: embedModelId,
-        documents: [transcriptRes.text],
-        chunk: true
-      })
-    }
+    console.log('Transcription successful:', transcriptText)
+
+    await ragIngest({
+      workspaceId,
+      modelId: embedModelId,
+      documents: [transcriptText]
+    })
+
   } catch (err) {
     console.error('RAG ingest failed during upload:', err)
   }
@@ -625,42 +624,3 @@ initAI().then(() => startBlobServer()).then(() => {
   console.error('Failed to start worker server:', err)
   rpc.workerReady({})
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
