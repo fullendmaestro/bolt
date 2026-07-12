@@ -20,12 +20,34 @@ const {
   transcribe,
   ragIngest,
   ragSearch,
-  PARAKEET_TDT_ENCODER_INT8,
-  PARAKEET_TDT_DECODER_INT8,
-  PARAKEET_TDT_VOCAB,
-  PARAKEET_TDT_PREPROCESSOR_INT8,
+  plugins,
+  PARAKEET_TDT_0_6B_V3_Q8_0,
   GTE_LARGE_FP16
 } = require('@qvac/bare-sdk')
+
+async function initAI() {
+  try {
+    const parakeetModule = await import('@qvac/sdk/parakeet-transcription/plugin');
+    const embeddingsModule = await import('@qvac/sdk/llamacpp-embedding/plugin');
+
+    // Extract the actual plugin definition from the named exports Vite created
+    const parakeet = parakeetModule.parakeetPlugin || parakeetModule.default || parakeetModule;
+    const embeddings = embeddingsModule.embeddingsPlugin || embeddingsModule.default || embeddingsModule;
+
+    // Register the unwrapped objects
+    plugins([
+      parakeet,
+      embeddings
+    ]);
+
+    console.log("P2P Worker plugins registered successfully!");
+  } catch (err) {
+    console.error("Failed to initialize AI plugins:", err);
+  }
+}
+
+// Ensure you call initAI() somewhere near the top of your worker lifecycle
+initAI();
 
 const pipe = Bare.IPC
 const rpc = new HRPC(pipe)
@@ -457,13 +479,7 @@ rpc.onUploadVideo(async (req) => {
     if (!transcribeModelId) {
       transcribeModelId = await loadModel({
         modelType: "parakeet",
-        modelSrc: PARAKEET_TDT_ENCODER_INT8,
-        modelConfig: {
-          parakeetEncoderSrc: PARAKEET_TDT_ENCODER_INT8,
-          parakeetDecoderSrc: PARAKEET_TDT_DECODER_INT8,
-          parakeetVocabSrc: PARAKEET_TDT_VOCAB,
-          parakeetPreprocessorSrc: PARAKEET_TDT_PREPROCESSOR_INT8,
-        },
+        modelSrc: PARAKEET_TDT_0_6B_V3_Q8_0,
       })
     }
     if (!embedModelId) {
