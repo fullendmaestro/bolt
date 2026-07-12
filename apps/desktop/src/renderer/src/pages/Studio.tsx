@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
+import { useEffect } from 'react'
 import {
   UploadCloud,
   BarChart,
@@ -13,7 +12,9 @@ import {
   X,
   Plus,
 } from 'lucide-react'
-import type { ChannelMetadata, VideoEntry } from '../../../shared/types'
+import type { VideoEntry } from '../../../shared/types'
+import { useChannel } from '@/hooks/useChannel'
+import { useVideoUpload } from '@/hooks/useVideoUpload'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,194 +31,72 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 // ── Studio Page ────────────────────────────────────────────
 export function Studio() {
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadBytesReceived, setUploadBytesReceived] = useState(0)
-  const [uploadTotalBytes, setUploadTotalBytes] = useState(0)
-  const [uploadTitle, setUploadTitle] = useState('')
-  const [channelData, setChannelData] = useState<ChannelMetadata | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
-  const [initializing, setInitializing] = useState(false)
+  const channel = useChannel()
+  const upload = useVideoUpload({ onUploadComplete: channel.appendVideo })
+  const {
+    channelData,
+    loading,
+    copied,
+    initializing,
+    channelsList,
+    activeChannelKey,
+    showInitModal,
+    setShowInitModal,
+    channelName,
+    setChannelName,
+    channelDesc,
+    setChannelDesc,
+    initError,
+    avatarPath,
+    setAvatarPath,
+    avatarPreview,
+    setAvatarPreview,
+    handleInitSubmit,
+    handleSelectAvatar,
+    handleCopyKey,
+    handleSelectChannel,
+    isCurrentChannelOwned,
+  } = channel
+  const {
+    uploading,
+    uploadProgress,
+    uploadBytesReceived,
+    uploadTotalBytes,
+    uploadBytesText,
+    uploadTitle,
+    setUploadTitle,
+    showUploadModal,
+    setShowUploadModal,
+    thumbnailPath,
+    setThumbnailPath,
+    thumbnailPreview,
+    setThumbnailPreview,
+    handleSelectThumbnail,
+    handleSelectAndUpload,
+  } = upload
 
-  // Channels List State
-  const [channelsList, setChannelsList] = useState<{ owned: any[], joined: any[] }>({ owned: [], joined: [] })
-  const [activeChannelKey, setActiveChannelKey] = useState<string | null>(null)
-
-  // Dialog state
-  const [showInitModal, setShowInitModal] = useState(false)
-  const [showUploadModal, setShowUploadModal] = useState(false) // <-- New Upload Modal State
-  const [channelName, setChannelName] = useState('')
-  const [channelDesc, setChannelDesc] = useState('')
-  const [initError, setInitError] = useState<string | null>(null)
-  const [avatarPath, setAvatarPath] = useState<string | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-
-  // Upload state
-  const [thumbnailPath, setThumbnailPath] = useState<string | null>(null)
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
-
-  const fetchChannelsList = async (selectKey?: string) => {
-    try {
-      const list = await window.qvacAPI.getChannels()
-      setChannelsList(list)
-
-      let keyToSelect = selectKey || activeChannelKey
-      if (!keyToSelect) {
-        if (list.owned.length > 0) keyToSelect = list.owned[list.owned.length - 1].publicKey
-        else if (list.joined.length > 0) keyToSelect = list.joined[list.joined.length - 1].publicKey
-      }
-
-      if (keyToSelect) {
-        handleSelectChannel(keyToSelect)
-      } else {
-        setLoading(false)
-      }
-    } catch (err) {
-      console.error('Failed to fetch channels:', err)
-      setLoading(false)
-    }
-  }
-
-  const handleSelectChannel = (key: string) => {
-    setActiveChannelKey(key)
-    setLoading(true)
-    window.qvacAPI.getUploads(key)
-  }
-
-  // Set up a persistent, global P2P message listener for the lifetime of this page
   useEffect(() => {
     const handleMessage = (msg: any) => {
-      if (msg.type === 'uploads-data') {
-        setChannelData(msg.channel || null)
-        setLoading(false)
-      } else if (msg.type === 'upload-complete') {
-        setChannelData((prev) => {
-          if (!prev) return prev
-          return { ...prev, videos: [msg.video, ...prev.videos] }
-        })
-        setUploading(false)
-        setUploadProgress(0)
-        setUploadBytesReceived(0)
-        setUploadTotalBytes(0)
-        setUploadTitle('')
-        setShowUploadModal(false) // Close modal on success
-        toast.success('Video uploaded successfully!')
-      } else if (msg.type === 'upload-progress') {
-        setUploadProgress(msg.percent)
-        setUploadBytesReceived(msg.bytesReceived || 0)
-        setUploadTotalBytes(msg.totalBytes || 0)
-      } else if (msg.type === 'channel-initialized') {
-        setInitializing(false)
-        setShowInitModal(false)
-        setInitError(null)
-        toast.success('Channel created successfully!')
-        // Refresh channels list and select new channel
-        fetchChannelsList(msg.publicKey)
-      } else if (msg.type === 'error') {
-        if (msg.command === 'upload-video') {
-          console.error('Upload error:', msg.message)
-          toast.error(`Upload failed: ${msg.message}`)
-          setUploading(false)
-        } else if (msg.command === 'init-channel') {
-          console.error('Channel init error:', msg.message)
-          setInitError(msg.message || 'Unknown error occurred')
-          toast.error(`Channel initialization failed: ${msg.message}`)
-          setInitializing(false)
-        }
-      }
+      channel.handleP2PMessage(msg)
+      upload.handleP2PMessage(msg)
     }
 
     window.qvacAPI.onP2PMessage(handleMessage)
 
-    // Kick off initial data load
-    setLoading(true)
-    fetchChannelsList()
-
     return () => {
       window.qvacAPI.removeP2PMessageListener()
     }
-  }, [])
-
-  const handleInitSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!channelName.trim()) return
-
-    setInitializing(true)
-    setInitError(null)
-    try {
-      await window.qvacAPI.initChannel(channelName.trim(), channelDesc.trim(), avatarPath || undefined)
-      // `channel-initialized` worker message will finalize state and close modal
-    } catch (err: any) {
-      console.error('Failed to init channel:', err)
-      setInitError(err.message || 'Failed to initialize channel')
-      setInitializing(false)
-    }
-  }
-
-  const handleSelectAvatar = async () => {
-    try {
-      const result = await window.qvacAPI.selectAvatar()
-      if (!result.canceled && result.filePath) {
-        setAvatarPath(result.filePath)
-        setAvatarPreview('local-asset://' + encodeURIComponent(result.filePath))
-      }
-    } catch (err) {
-      console.error('Avatar selection failed:', err)
-    }
-  }
-
-  const handleSelectThumbnail = async () => {
-    try {
-      const result = await window.qvacAPI.selectThumbnail()
-      if (!result.canceled && result.filePath) {
-        setThumbnailPath(result.filePath)
-        setThumbnailPreview('local-asset://' + encodeURIComponent(result.filePath))
-      }
-    } catch (err) {
-      console.error('Thumbnail selection failed:', err)
-    }
-  }
-
-  const handleSelectAndUpload = async () => {
-    setUploading(true)
-    try {
-      const result = await window.qvacAPI.selectAndUploadVideo(
-        uploadTitle || 'Untitled Upload',
-        thumbnailPath || undefined
-      )
-      if (result.canceled) {
-        setUploading(false)
-      } else {
-        // Reset thumbnail after initiating upload
-        setThumbnailPath(null)
-        setThumbnailPreview(null)
-      }
-      // Upload progress will come via worker messages
-    } catch (err) {
-      console.error('Upload failed:', err)
-      setUploading(false)
-    }
-  }
-
-  const handleCopyKey = () => {
-    if (channelData?.publicKey) {
-      navigator.clipboard.writeText(channelData.publicKey)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
+  }, [channel, upload])
 
   const uploads: VideoEntry[] = channelData?.videos || []
-  const isCurrentChannelOwned = channelsList.owned.some(c => c.publicKey === activeChannelKey)
 
   return (
-    <div className="max-w-[1400px] mx-auto p-6 md:p-8 flex gap-8 items-start">
+    <div className="max-w-350 mx-auto p-6 md:p-8 flex gap-8 items-start">
       {/* ── Modals ── */}
 
       {/* Shadcn Channel Init Dialog */}
       <Dialog open={showInitModal} onOpenChange={setShowInitModal}>
-        <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-neutral-800 text-white">
+        <DialogContent className="sm:max-w-106.25 bg-[#1a1a1a] border-neutral-800 text-white">
           <form onSubmit={handleInitSubmit}>
             <DialogHeader>
               <DialogTitle>Create Your Channel</DialogTitle>
@@ -322,7 +201,7 @@ export function Studio() {
         }
         setShowUploadModal(open)
       }}>
-        <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-neutral-800 text-white">
+        <DialogContent className="sm:max-w-106.25 bg-[#1a1a1a] border-neutral-800 text-white">
           <DialogHeader>
             <DialogTitle>Upload to {channelData?.name}</DialogTitle>
             <DialogDescription className="text-neutral-400">

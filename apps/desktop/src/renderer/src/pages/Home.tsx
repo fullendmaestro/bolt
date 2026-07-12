@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useFeed } from '@/hooks/useFeed'
 import { VideoCard } from '../components/VideoCard'
 import { Plus, Loader2, Radio } from 'lucide-react'
-import type { FeedItem } from '../../../shared/types'
 
 const CATEGORIES = [
   'All',
@@ -16,71 +15,18 @@ const CATEGORIES = [
 ]
 
 export function Home() {
-  const [activeCategory, setActiveCategory] = useState('All')
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [joinDialogOpen, setJoinDialogOpen] = useState(false)
-  const [channelKeyInput, setChannelKeyInput] = useState('')
-  const [joining, setJoining] = useState(false)
-
-  // Convert P2P feed items to the Stream format used by VideoCard
-  const feedStreams = feedItems.map((item) => ({
-    id: item.channelKey + ':' + item.video.id,
-    title: item.video.title,
-    channel: item.channelName,
-    viewers: '0',
-    isLive: item.video.isLive,
-    thumbnail: item.video.thumbnailPath || '',
-    avatar: item.channelAvatar || '',
-    time: new Date(item.video.timestamp).toLocaleDateString(),
-    duration: item.video.duration,
-    // Store routing info
-    channelKey: item.channelKey,
-    videoId: item.video.id
-  }))
-
-  const loadFeed = useCallback(() => {
-    setLoading(true)
-
-    // Listen for the feed response
-    const handleMessage = (msg: any) => {
-      if (msg.type === 'feed-data') {
-        setFeedItems(msg.items || [])
-        setLoading(false)
-      } else if (msg.type === 'error' && msg.command === 'get-feed') {
-        console.error('Failed to get feed:', msg.message)
-        setLoading(false)
-      }
-    }
-
-    window.qvacAPI.onP2PMessage(handleMessage)
-    window.qvacAPI.getFeed()
-
-    return () => {
-      window.qvacAPI.removeP2PMessageListener()
-    }
-  }, [])
-
-  useEffect(() => {
-    const cleanup = loadFeed()
-    return cleanup
-  }, [loadFeed])
-
-  const handleJoinChannel = async () => {
-    if (!channelKeyInput.trim()) return
-    setJoining(true)
-    try {
-      await window.qvacAPI.joinChannel(channelKeyInput.trim())
-      setChannelKeyInput('')
-      setJoinDialogOpen(false)
-      // Refresh the feed after a short delay for sync
-      setTimeout(loadFeed, 2000)
-    } catch (err) {
-      console.error('Failed to join channel:', err)
-    } finally {
-      setJoining(false)
-    }
-  }
+  const {
+    activeCategory,
+    setActiveCategory,
+    feedStreams,
+    loading,
+    joinDialogOpen,
+    setJoinDialogOpen,
+    channelKeyInput,
+    setChannelKeyInput,
+    joining,
+    handleJoinChannel,
+  } = useFeed()
 
   const displayStreams = feedStreams
 
