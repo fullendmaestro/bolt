@@ -129,6 +129,18 @@ schemaNs.register({
   fields: [{ name: 'destinationPath', type: 'string' }]
 })
 
+schemaNs.register({
+  name: 'rag-query-request',
+  fields: [
+    { name: 'workspaceId', type: 'string' },
+    { name: 'query', type: 'string' }
+  ]
+})
+schemaNs.register({
+  name: 'rag-query-response',
+  fields: [{ name: 'resultsJson', type: 'string' }]
+})
+
 // ── Server Events (Worker -> Main) ──
 schemaNs.register({
   name: 'channel-event',
@@ -220,6 +232,11 @@ ns.register({
   name: 'downloadVideo',
   request: { name: '@bolt/download-video-request', stream: false },
   response: { name: '@bolt/download-video-response', stream: false }
+})
+ns.register({
+  name: 'ragQuery',
+  request: { name: '@bolt/rag-query-request', stream: false },
+  response: { name: '@bolt/rag-query-response', stream: false }
 })
 
 // Send-only commands (Worker -> Main)

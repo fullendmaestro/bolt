@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "schema": [
     {
       "name": "join-channel-request",
@@ -389,6 +389,37 @@
           "name": "command",
           "type": "string",
           "version": 1
+        }
+      ]
+    },
+    {
+      "name": "rag-query-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "workspaceId",
+          "type": "string",
+          "version": 2
+        },
+        {
+          "name": "query",
+          "type": "string",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "name": "rag-query-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "resultsJson",
+          "type": "string",
+          "version": 2
         }
       ]
     }

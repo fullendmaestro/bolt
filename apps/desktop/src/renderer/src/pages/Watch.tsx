@@ -7,7 +7,15 @@ import { ChatInterface } from '../components/ChatInterface'
 type ConnectionState = 'connecting' | 'buffering' | 'streaming' | 'error'
 type DownloadState = 'idle' | 'downloading' | 'complete'
 
-export function Watch() {
+export function Watch({
+  modelStatus,
+  modelProgress,
+  loadModel
+}: {
+  modelStatus: string
+  modelProgress: number
+  loadModel: () => void
+}) {
   const { id } = useParams()
   const location = useLocation()
   const stream = location.state?.stream
@@ -20,7 +28,6 @@ export function Watch() {
   const [downloadBytesReceived, setDownloadBytesReceived] = useState(0)
   const [downloadTotalBytes, setDownloadTotalBytes] = useState(0)
   const [swarmCount, setSwarmCount] = useState<number>(0)
-  const [vectorStoreId, setVectorStoreId] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Parse compound ID (channelKey:videoId)
@@ -31,11 +38,6 @@ export function Watch() {
     if (!channelKey || !videoId) return
 
     setConnectionState('connecting')
-
-    // Fetch AI Context (vector store ID)
-    window.qvacAPI.getVideoStoreId(videoId)
-      .then((storeId) => setVectorStoreId(storeId))
-      .catch(console.error)
 
     const handleMessage = (msg: any) => {
       if (msg.type === 'stream-url' && msg.channelKey === channelKey && msg.videoId === videoId) {
@@ -275,7 +277,13 @@ export function Watch() {
       {/* AI Assistant Sidebar */}
       <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
         <div className="sticky top-0 h-[calc(100vh-120px)] rounded-xl overflow-hidden border border-white/10 shadow-lg bg-[#0F0F0F] flex flex-col">
-          <ChatInterface currentVideo={videoId && vectorStoreId ? { videoId, videoTitle: displayTitle, vectorStoreId } : null} />
+          <ChatInterface
+            modelStatus={modelStatus}
+            modelProgress={modelProgress}
+            loadModel={loadModel}
+            channelKey={channelKey}
+            currentVideoWorkspaceId={videoId ? `rag-${videoId}` : undefined}
+          />
         </div>
       </div>
     </div>
