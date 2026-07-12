@@ -11,6 +11,7 @@ const goodbye = require('graceful-goodbye')
 const b4a = require('b4a')
 const path = require('bare-path')
 const fs = require('bare-fs')
+const { spawnSync } = require('bare-subprocess')
 const crypto = require('hypercore-crypto')
 
 const HRPC = require('../shared/spec/hrpc/index.js')
@@ -495,8 +496,25 @@ rpc.onUploadVideo(async (req) => {
       embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16 })
     }
 
-    const audioBuffer = fs.readFileSync(req.filePath)
+    console.log('Extracting audio with FFmpeg...')
+    const tempAudioPath = req.filePath + '.wav'
 
+    const ff = spawnSync('ffmpeg', [
+      '-y',
+      '-i', req.filePath,
+      '-ar', '16000',
+      '-ac', '1',
+      '-c:a', 'pcm_s16le',
+      tempAudioPath
+    ], { stdio: 'ignore' })
+
+    if (ff.status !== 0) {
+      throw new Error(`FFmpeg extraction failed with status code ${ff.status}`)
+    }
+
+    const audioBuffer = fs.readFileSync(tempAudioPath)
+
+    console.log('Audio extracted. Starting Parakeet transcription on CPU (this may take a while)...')
     const transcriptText = await transcribe({
       modelId: transcribeModelId,
       audioChunk: audioBuffer
