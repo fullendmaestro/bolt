@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ChatInterface } from '../components/ChatInterface'
+import { WatchSidebar } from '../components/WatchSidebar'
 import { VideoPlayer, type ConnectionState } from '@/features/watch/VideoPlayer'
 import { StreamMetadata, type DownloadState } from '@/features/watch/StreamMetadata'
+import type { VideoEntry } from '../../../shared/types'
 
 export function Watch({
   modelStatus,
@@ -17,6 +18,9 @@ export function Watch({
   const { id } = useParams()
   const location = useLocation()
   const stream = location.state?.stream
+  const [video, setVideo] = useState<VideoEntry | null>(
+    (stream?.video ?? null) as VideoEntry | null
+  )
 
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
@@ -40,6 +44,12 @@ export function Watch({
       if (msg.type === 'stream-url' && msg.channelKey === channelKey && msg.videoId === videoId) {
         setStreamUrl(msg.url)
         setConnectionState('buffering')
+      } else if (
+        msg.type === 'video-metadata-updated' &&
+        msg.channelKey === channelKey &&
+        msg.video?.id === videoId
+      ) {
+        setVideo(msg.video)
       } else if (msg.type === 'error' && msg.command === 'start-stream') {
         setConnectionState('error')
         toast.error(`Failed to load stream: ${msg.message}`)
@@ -79,6 +89,10 @@ export function Watch({
       window.qvacAPI.removeChannelEventListener?.()
     }
   }, [channelKey, videoId])
+
+  useEffect(() => {
+    setVideo((stream?.video ?? null) as VideoEntry | null)
+  }, [stream])
 
   const handleJoinChannel = async () => {
     if (!channelKey) return
@@ -136,17 +150,14 @@ export function Watch({
       </div>
 
       {/* AI Assistant Sidebar */}
-      <div className="w-full lg:w-100 xl:w-105 shrink-0">
-        <div className="sticky top-0 h-[calc(100vh-120px)] rounded-xl overflow-hidden border border-white/10 shadow-lg bg-[#0F0F0F] flex flex-col">
-          <ChatInterface
-            modelStatus={modelStatus}
-            modelProgress={modelProgress}
-            loadModel={loadModel}
-            channelKey={channelKey}
-            currentVideoWorkspaceId={videoId ? `rag-${videoId}` : undefined}
-          />
-        </div>
-      </div>
+      <WatchSidebar
+        modelStatus={modelStatus}
+        modelProgress={modelProgress}
+        loadModel={loadModel}
+        channelKey={channelKey}
+        currentVideoWorkspaceId={videoId ? `rag-${videoId}` : undefined}
+        video={video}
+      />
     </div>
   )
 }

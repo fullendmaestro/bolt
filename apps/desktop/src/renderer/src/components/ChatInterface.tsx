@@ -1,60 +1,31 @@
-import React, { useEffect, useRef } from 'react'
+import React from 'react'
 import { useLocalRuntime } from '@assistant-ui/react'
 import { createQvacModelAdapter } from '../lib/qvac-adapter'
-import type { ChannelEvent } from '../../../shared/types'
 import { Assistant } from './Assistant'
 
 interface ChatInterfaceProps {
   modelStatus: string
   modelProgress: number
   loadModel: () => void
-  channelKey?: string | null
   currentVideoWorkspaceId?: string
+  inferenceMode?: 'local' | 'channel_peer' | 'cloud'
 }
 
 export function ChatInterface({
   modelStatus,
   modelProgress,
   loadModel,
-  channelKey,
-  currentVideoWorkspaceId
+  currentVideoWorkspaceId,
+  inferenceMode
 }: ChatInterfaceProps): React.ReactElement {
-  // Accumulate channel events for AI context injection
-  const channelEventsRef = useRef<ChannelEvent[]>([])
-
-  // Create the adapter with a ref to the events buffer
   const adapter = React.useMemo(
-    () => createQvacModelAdapter(channelEventsRef, currentVideoWorkspaceId),
-    [currentVideoWorkspaceId]
+    () => createQvacModelAdapter({ currentVideoWorkspaceId, inferenceMode }),
+    [currentVideoWorkspaceId, inferenceMode]
   )
 
   const runtime = useLocalRuntime(adapter)
 
   // Listen for live channel events when watching a channel
-  useEffect(() => {
-    if (!channelKey) return
-
-    // Clear previous events when switching channels
-    channelEventsRef.current = []
-
-    const handleEvent = (event: ChannelEvent) => {
-      // Only accumulate events for the current channel
-      if (event.channelKey === channelKey) {
-        channelEventsRef.current.push(event)
-        // Keep only the last 20 events to avoid context overflow
-        if (channelEventsRef.current.length > 20) {
-          channelEventsRef.current = channelEventsRef.current.slice(-20)
-        }
-      }
-    }
-
-    window.qvacAPI.onChannelEvent(handleEvent)
-
-    return () => {
-      window.qvacAPI.removeChannelEventListener()
-    }
-  }, [channelKey])
-
   return (
     <div className="flex flex-col h-full bg-[#0F0F0F]">
       {/* Main Chat Interface Layout */}
