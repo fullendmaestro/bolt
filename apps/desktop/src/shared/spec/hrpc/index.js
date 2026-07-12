@@ -39,7 +39,11 @@ const methods = new Map([
   ['@bolt/errorEvent', 15],
   [15, '@bolt/errorEvent'],
   ['@bolt/ragQuery', 16],
-  [16, '@bolt/ragQuery']
+  [16, '@bolt/ragQuery'],
+  ['@bolt/uploadComplete', 17],
+  [17, '@bolt/uploadComplete'],
+  ['@bolt/updateVideoMetadata', 18],
+  [18, '@bolt/updateVideoMetadata']
 ])
 
 class HRPC {
@@ -63,7 +67,9 @@ class HRPC {
       ['@bolt/uploadProgress', getEncoding('@bolt/upload-progress')],
       ['@bolt/downloadProgress', getEncoding('@bolt/download-progress')],
       ['@bolt/errorEvent', getEncoding('@bolt/error-event')],
-      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-request')]
+      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-request')],
+      ['@bolt/uploadComplete', getEncoding('@bolt/upload-complete')],
+      ['@bolt/updateVideoMetadata', getEncoding('@bolt/update-video-metadata-request')]
     ])
     this._responseEncodings = new Map([
       ['@bolt/joinChannel', getEncoding('@bolt/channel-response')],
@@ -77,7 +83,9 @@ class HRPC {
       ['@bolt/startStream', getEncoding('@bolt/start-stream-response')],
       ['@bolt/injectEvent', getEncoding('@bolt/success-response')],
       ['@bolt/downloadVideo', getEncoding('@bolt/download-video-response')],
-      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-response')]
+      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-response')],
+      ['@bolt/uploadComplete', getEncoding('@bolt/empty-request')],
+      ['@bolt/updateVideoMetadata', getEncoding('@bolt/update-video-metadata-response')]
     ])
     this._rpc = new RPC(stream, async (req) => {
       const command = methods.get(req.command)
@@ -243,6 +251,14 @@ class HRPC {
     return this._call('@bolt/ragQuery', args)
   }
 
+  async uploadComplete(args) {
+    return this._call('@bolt/uploadComplete', args)
+  }
+
+  async updateVideoMetadata(args) {
+    return this._call('@bolt/updateVideoMetadata', args)
+  }
+
   onJoinChannel(responseFn) {
     this._handlers['@bolt/joinChannel'] = responseFn
   }
@@ -309,6 +325,14 @@ class HRPC {
 
   onRagQuery(responseFn) {
     this._handlers['@bolt/ragQuery'] = responseFn
+  }
+
+  onUploadComplete(responseFn) {
+    this._handlers['@bolt/uploadComplete'] = responseFn
+  }
+
+  onUpdateVideoMetadata(responseFn) {
+    this._handlers['@bolt/updateVideoMetadata'] = responseFn
   }
 
   _requestIsStream(command) {

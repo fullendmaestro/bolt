@@ -177,13 +177,15 @@ const encoding7 = {
 // @bolt/upload-video-request
 const encoding8 = {
   preencode(state, m) {
-    state.end++ // max flag is 16 so always one byte
+    state.end++ // max flag is 64 so always one byte
 
     if (m.filePath) c.string.preencode(state, m.filePath)
     if (m.title) c.string.preencode(state, m.title)
     if (m.duration) c.string.preencode(state, m.duration)
     if (m.thumbnailPath) c.string.preencode(state, m.thumbnailPath)
     if (m.channelKey) c.string.preencode(state, m.channelKey)
+    if (version >= 2 && m.matchData) c.string.preencode(state, m.matchData)
+    if (version >= 2 && m.transcriptPath) c.string.preencode(state, m.transcriptPath)
   },
   encode(state, m) {
     const flags =
@@ -191,7 +193,9 @@ const encoding8 = {
       (m.title ? 2 : 0) |
       (m.duration ? 4 : 0) |
       (m.thumbnailPath ? 8 : 0) |
-      (m.channelKey ? 16 : 0)
+      (m.channelKey ? 16 : 0) |
+      ((version >= 2 && m.matchData) ? 32 : 0) |
+      ((version >= 2 && m.transcriptPath) ? 64 : 0)
 
     c.uint.encode(state, flags)
 
@@ -200,6 +204,8 @@ const encoding8 = {
     if (m.duration) c.string.encode(state, m.duration)
     if (m.thumbnailPath) c.string.encode(state, m.thumbnailPath)
     if (m.channelKey) c.string.encode(state, m.channelKey)
+    if (version >= 2 && m.matchData) c.string.encode(state, m.matchData)
+    if (version >= 2 && m.transcriptPath) c.string.encode(state, m.transcriptPath)
   },
   decode(state) {
     const flags = c.uint.decode(state)
@@ -209,13 +215,41 @@ const encoding8 = {
       title: (flags & 2) !== 0 ? c.string.decode(state) : null,
       duration: (flags & 4) !== 0 ? c.string.decode(state) : null,
       thumbnailPath: (flags & 8) !== 0 ? c.string.decode(state) : null,
-      channelKey: (flags & 16) !== 0 ? c.string.decode(state) : null
+      channelKey: (flags & 16) !== 0 ? c.string.decode(state) : null,
+      matchData: (version >= 2 && (flags & 32) !== 0) ? c.string.decode(state) : null,
+      transcriptPath: (version >= 2 && (flags & 64) !== 0) ? c.string.decode(state) : null
+    }
+  }
+}
+
+// @bolt/upload-complete
+const encoding9 = {
+  preencode(state, m) {
+    state.end++ // max flag is 2 so always one byte
+
+    if (m.channelKey) c.string.preencode(state, m.channelKey)
+    if (m.videoJson) c.string.preencode(state, m.videoJson)
+  },
+  encode(state, m) {
+    const flags = (m.channelKey ? 1 : 0) | (m.videoJson ? 2 : 0)
+
+    c.uint.encode(state, flags)
+
+    if (m.channelKey) c.string.encode(state, m.channelKey)
+    if (m.videoJson) c.string.encode(state, m.videoJson)
+  },
+  decode(state) {
+    const flags = c.uint.decode(state)
+
+    return {
+      channelKey: (flags & 1) !== 0 ? c.string.decode(state) : null,
+      videoJson: (flags & 2) !== 0 ? c.string.decode(state) : null
     }
   }
 }
 
 // @bolt/upload-video-response
-const encoding9 = {
+const encoding10 = {
   preencode(state, m) {
     state.end++ // max flag is 1 so always one byte
 
@@ -238,10 +272,10 @@ const encoding9 = {
 }
 
 // @bolt/get-uploads-request
-const encoding10 = encoding0
+const encoding11 = encoding0
 
 // @bolt/get-uploads-response
-const encoding11 = {
+const encoding12 = {
   preencode(state, m) {
     state.end++ // max flag is 1 so always one byte
 
@@ -264,10 +298,10 @@ const encoding11 = {
 }
 
 // @bolt/get-channels-request
-const encoding12 = encoding2
+const encoding13 = encoding2
 
 // @bolt/get-channels-response
-const encoding13 = {
+const encoding14 = {
   preencode(state, m) {
     state.end++ // max flag is 1 so always one byte
 
@@ -290,7 +324,7 @@ const encoding13 = {
 }
 
 // @bolt/start-stream-request
-const encoding14 = {
+const encoding15 = {
   preencode(state, m) {
     state.end++ // max flag is 2 so always one byte
 
@@ -316,7 +350,7 @@ const encoding14 = {
 }
 
 // @bolt/start-stream-response
-const encoding15 = {
+const encoding16 = {
   preencode(state, m) {
     state.end++ // max flag is 4 so always one byte
 
@@ -345,7 +379,7 @@ const encoding15 = {
 }
 
 // @bolt/inject-event-request
-const encoding16 = {
+const encoding17 = {
   preencode(state, m) {
     state.end++ // max flag is 1 so always one byte
 
@@ -368,10 +402,10 @@ const encoding16 = {
 }
 
 // @bolt/success-response
-const encoding17 = encoding4
+const encoding18 = encoding4
 
 // @bolt/download-video-request
-const encoding18 = {
+const encoding19 = {
   preencode(state, m) {
     state.end++ // max flag is 4 so always one byte
 
@@ -400,7 +434,7 @@ const encoding18 = {
 }
 
 // @bolt/download-video-response
-const encoding19 = {
+const encoding20 = {
   preencode(state, m) {
     state.end++ // max flag is 1 so always one byte
 
@@ -422,11 +456,17 @@ const encoding19 = {
   }
 }
 
+// @bolt/update-video-metadata-request
+const encoding21 = encoding9
+
+// @bolt/update-video-metadata-response
+const encoding22 = encoding4
+
 // @bolt/channel-event
-const encoding20 = encoding16
+const encoding23 = encoding17
 
 // @bolt/upload-progress
-const encoding21 = {
+const encoding24 = {
   preencode(state, m) {
     state.end++ // max flag is 2 so always one byte
 
@@ -452,7 +492,7 @@ const encoding21 = {
 }
 
 // @bolt/download-progress
-const encoding22 = {
+const encoding25 = {
   preencode(state, m) {
     state.end++ // max flag is 16 so always one byte
 
@@ -492,7 +532,7 @@ const encoding22 = {
 }
 
 // @bolt/error-event
-const encoding23 = {
+const encoding26 = {
   preencode(state, m) {
     state.end++ // max flag is 2 so always one byte
 
@@ -518,7 +558,7 @@ const encoding23 = {
 }
 
 // @bolt/rag-query-request
-const encoding24 = {
+const encoding27 = {
   preencode(state, m) {
     state.end++ // max flag is 2 so always one byte
 
@@ -544,7 +584,7 @@ const encoding24 = {
 }
 
 // @bolt/rag-query-response
-const encoding25 = {
+const encoding28 = {
   preencode(state, m) {
     state.end++ // max flag is 1 so always one byte
 
@@ -607,40 +647,46 @@ function getEncoding(name) {
       return encoding7
     case '@bolt/upload-video-request':
       return encoding8
-    case '@bolt/upload-video-response':
+    case '@bolt/upload-complete':
       return encoding9
-    case '@bolt/get-uploads-request':
+    case '@bolt/upload-video-response':
       return encoding10
-    case '@bolt/get-uploads-response':
+    case '@bolt/get-uploads-request':
       return encoding11
-    case '@bolt/get-channels-request':
+    case '@bolt/get-uploads-response':
       return encoding12
-    case '@bolt/get-channels-response':
+    case '@bolt/get-channels-request':
       return encoding13
-    case '@bolt/start-stream-request':
+    case '@bolt/get-channels-response':
       return encoding14
-    case '@bolt/start-stream-response':
+    case '@bolt/start-stream-request':
       return encoding15
-    case '@bolt/inject-event-request':
+    case '@bolt/start-stream-response':
       return encoding16
-    case '@bolt/success-response':
+    case '@bolt/inject-event-request':
       return encoding17
-    case '@bolt/download-video-request':
+    case '@bolt/success-response':
       return encoding18
-    case '@bolt/download-video-response':
+    case '@bolt/download-video-request':
       return encoding19
-    case '@bolt/channel-event':
+    case '@bolt/download-video-response':
       return encoding20
-    case '@bolt/upload-progress':
+    case '@bolt/update-video-metadata-request':
       return encoding21
-    case '@bolt/download-progress':
+    case '@bolt/update-video-metadata-response':
       return encoding22
-    case '@bolt/error-event':
+    case '@bolt/channel-event':
       return encoding23
-    case '@bolt/rag-query-request':
+    case '@bolt/upload-progress':
       return encoding24
-    case '@bolt/rag-query-response':
+    case '@bolt/download-progress':
       return encoding25
+    case '@bolt/error-event':
+      return encoding26
+    case '@bolt/rag-query-request':
+      return encoding27
+    case '@bolt/rag-query-response':
+      return encoding28
     default:
       throw new Error('Encoder not found ' + name)
   }

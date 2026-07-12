@@ -3,6 +3,14 @@
 // Shared between Renderer, Main Process, and Bare Worker
 // ============================================================
 
+/** Match metadata captured during upload */
+export interface MatchData {
+  matchType: string
+  homeTeam: string
+  awayTeam: string
+  finalScore: string
+}
+
 /** A single video entry stored inside a Channel's Hyperdrive metadata */
 export interface VideoEntry {
   /** Unique video identifier (UUID) */
@@ -23,6 +31,10 @@ export interface VideoEntry {
   isLive: boolean
   /** Hyperdrive path to the video thumbnail image (optional) */
   thumbnailPath?: string
+  /** Parsed match metadata supplied during upload */
+  matchData?: MatchData | null
+  /** AI-generated match summary, appended after upload */
+  aiSummary?: string | null
 }
 
 /** Metadata for a Channel (a user's persistent Hyperdrive) */
@@ -68,7 +80,15 @@ export type P2PCommand =
   | { type: 'leave-channel'; channelKey: string }
   | { type: 'get-feed' }
   | { type: 'init-channel'; name: string; description: string; avatarPath?: string }
-  | { type: 'upload-video'; filePath: string; title: string; duration: string; thumbnailPath?: string }
+  | {
+      type: 'upload-video'
+      filePath: string
+      title: string
+      duration: string
+      thumbnailPath?: string
+      matchData?: string
+      transcriptPath?: string
+    }
   | { type: 'get-uploads' }
   | { type: 'start-stream'; channelKey: string; videoId: string }
   | { type: 'inject-event'; event: Omit<ChannelEvent, 'channelKey'> }
@@ -85,10 +105,18 @@ export type P2PResponse =
   | { type: 'feed-data'; items: FeedItem[] }
   | { type: 'channel-initialized'; publicKey: string; name: string }
   | { type: 'upload-progress'; videoId: string; percent: number }
-  | { type: 'upload-complete'; video: VideoEntry }
+  | { type: 'upload-complete'; channelKey: string; video: VideoEntry }
+  | { type: 'video-metadata-updated'; channelKey: string; video: VideoEntry }
   | { type: 'uploads-data'; channel: ChannelMetadata | null }
   | { type: 'stream-url'; url: string; channelKey: string; videoId: string }
   | { type: 'channel-event'; event: ChannelEvent }
-  | { type: 'download-progress'; videoId: string; channelKey: string; percent: number; bytesReceived: number; totalBytes: number }
+  | {
+      type: 'download-progress'
+      videoId: string
+      channelKey: string
+      percent: number
+      bytesReceived: number
+      totalBytes: number
+    }
   | { type: 'download-complete'; videoId: string; channelKey: string; destinationPath: string }
   | { type: 'error'; message: string; command?: string }
