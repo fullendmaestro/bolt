@@ -32,11 +32,6 @@ export function Studio() {
     channel.setAvatarPreview(null)
   }
 
-  const handleClearThumbnail = () => {
-    upload.setThumbnailPath(null)
-    upload.setThumbnailPreview(null)
-  }
-
   return (
     <div className="max-w-350 mx-auto p-6 md:p-8 flex gap-8 items-start">
       <CreateChannelModal
@@ -60,13 +55,28 @@ export function Studio() {
         channelName={channel.channelData?.name}
         uploadTitle={upload.uploadTitle}
         onUploadTitleChange={upload.setUploadTitle}
+        videoName={upload.videoName}
+        videoPreview={upload.videoPreview}
+        onVideoChange={upload.handleVideoChange}
+        thumbnailName={upload.thumbnailName}
         thumbnailPreview={upload.thumbnailPreview}
-        onSelectThumbnail={upload.handleSelectThumbnail}
-        onClearThumbnail={handleClearThumbnail}
+        onThumbnailChange={upload.handleThumbnailChange}
+        matchType={upload.matchType}
+        onMatchTypeChange={upload.setMatchType}
+        homeTeam={upload.homeTeam}
+        onHomeTeamChange={upload.setHomeTeam}
+        awayTeam={upload.awayTeam}
+        onAwayTeamChange={upload.setAwayTeam}
+        finalScore={upload.finalScore}
+        onFinalScoreChange={upload.setFinalScore}
+        transcriptMode={upload.transcriptMode}
+        onTranscriptModeChange={upload.setTranscriptMode}
+        transcriptName={upload.transcriptName}
+        onTranscriptChange={upload.handleTranscriptChange}
         uploading={upload.uploading}
         uploadProgress={upload.uploadProgress}
         uploadBytesText={upload.uploadBytesText}
-        onSelectAndUpload={upload.handleSelectAndUpload}
+        onSubmitUpload={upload.handleSubmitUpload}
       />
 
       <ChannelList
