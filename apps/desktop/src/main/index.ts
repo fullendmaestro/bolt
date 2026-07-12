@@ -20,9 +20,7 @@ let rpc: any = null
 
 // --- Strict Instance Isolation ---
 // Parse custom user data directory for multi-peer local testing
-const userDataArg = process.argv.find((arg) =>
-  arg.startsWith('--user-data-dir=')
-)
+const userDataArg = process.argv.find((arg) => arg.startsWith('--user-data-dir='))
 if (userDataArg) {
   const dir = userDataArg.replace('--user-data-dir=', '')
   const absolutePath = join(process.cwd(), dir)
@@ -99,11 +97,24 @@ function initP2PWorker(): void {
   })
 
   rpc.onUploadProgress(({ videoId, percent, bytesReceived, totalBytes }) => {
-    win?.webContents.send('p2p-worker-message', { type: 'upload-progress', videoId, percent, bytesReceived, totalBytes })
+    win?.webContents.send('p2p-worker-message', {
+      type: 'upload-progress',
+      videoId,
+      percent,
+      bytesReceived,
+      totalBytes
+    })
   })
 
   rpc.onDownloadProgress(({ videoId, channelKey, percent, bytesReceived, totalBytes }) => {
-    win?.webContents.send('p2p-worker-message', { type: 'download-progress', videoId, channelKey, percent, bytesReceived, totalBytes })
+    win?.webContents.send('p2p-worker-message', {
+      type: 'download-progress',
+      videoId,
+      channelKey,
+      percent,
+      bytesReceived,
+      totalBytes
+    })
   })
 
   worker.on('error', (err: Error) => {
@@ -127,7 +138,7 @@ function setupHandlers(): void {
     setModelId: (nextModelId) => {
       modelId = nextModelId
     },
-    localStore,
+    localStore
   }
 
   registerAiHandlers(handlerContext)

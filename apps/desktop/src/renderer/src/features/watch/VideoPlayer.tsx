@@ -19,7 +19,7 @@ export function VideoPlayer({
   onCanPlay,
   onWaiting,
   onPlaying,
-  onError,
+  onError
 }: VideoPlayerProps) {
   return (
     <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-white/5 group">
@@ -52,7 +52,9 @@ export function VideoPlayer({
           {connectionState === 'error' && (
             <>
               <p className="text-sm text-red-400">Failed to connect to stream</p>
-              <p className="text-xs text-neutral-500">The channel may be offline or the video unavailable.</p>
+              <p className="text-xs text-neutral-500">
+                The channel may be offline or the video unavailable.
+              </p>
             </>
           )}
         </div>

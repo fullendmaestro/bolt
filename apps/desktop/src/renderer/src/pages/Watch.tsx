@@ -17,7 +17,7 @@ export function Watch({
   const { id } = useParams()
   const location = useLocation()
   const stream = location.state?.stream
-  
+
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const [joined, setJoined] = useState(false)
@@ -43,12 +43,20 @@ export function Watch({
       } else if (msg.type === 'error' && msg.command === 'start-stream') {
         setConnectionState('error')
         toast.error(`Failed to load stream: ${msg.message}`)
-      } else if (msg.type === 'download-progress' && msg.channelKey === channelKey && msg.videoId === videoId) {
+      } else if (
+        msg.type === 'download-progress' &&
+        msg.channelKey === channelKey &&
+        msg.videoId === videoId
+      ) {
         setDownloadProgress(msg.percent)
         setDownloadBytesReceived(msg.bytesReceived || 0)
         setDownloadTotalBytes(msg.totalBytes || 0)
         setDownloadState('downloading')
-      } else if (msg.type === 'download-complete' && msg.channelKey === channelKey && msg.videoId === videoId) {
+      } else if (
+        msg.type === 'download-complete' &&
+        msg.channelKey === channelKey &&
+        msg.videoId === videoId
+      ) {
         setDownloadState('complete')
         setDownloadProgress(100)
         toast.success('Download complete! Your node is now seeding this video.')

@@ -2,7 +2,12 @@ import { ipcMain } from 'electron'
 import { LLAMA_3_2_1B_INST_Q4_0, loadModel, unloadModel, completion } from '@qvac/sdk'
 import type { IpcHandlerContext } from './types'
 
-export function registerAiHandlers({ getWindow, getRpc, getModelId, setModelId }: IpcHandlerContext): void {
+export function registerAiHandlers({
+  getWindow,
+  getRpc,
+  getModelId,
+  setModelId
+}: IpcHandlerContext): void {
   ipcMain.handle('load-model', async () => {
     const modelId = await loadModel({
       modelSrc: LLAMA_3_2_1B_INST_Q4_0,

@@ -2,7 +2,11 @@ import { dialog, ipcMain } from 'electron'
 import type { IpcHandlerContext } from './types'
 import type { ChannelEvent } from '../../shared/types'
 
-export function registerChannelHandlers({ getWindow, getRpc, localStore }: IpcHandlerContext): void {
+export function registerChannelHandlers({
+  getWindow,
+  getRpc,
+  localStore
+}: IpcHandlerContext): void {
   ipcMain.handle('channel:join', async (_event, channelKey: string) => {
     const channels = localStore.get('joinedChannels', [])
     if (!channels.includes(channelKey)) {
@@ -30,24 +34,31 @@ export function registerChannelHandlers({ getWindow, getRpc, localStore }: IpcHa
     return JSON.parse(res.channelsJson)
   })
 
-  ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
-    try {
-      const res = await getRpc().initChannel({ name, description, avatarPath: avatarPath || '' })
+  ipcMain.handle(
+    'channel:init',
+    async (_event, name: string, description: string, avatarPath?: string) => {
+      try {
+        const res = await getRpc().initChannel({ name, description, avatarPath: avatarPath || '' })
 
-      const ownedChannels = localStore.get('ownedChannels', [])
-      if (!ownedChannels.includes(res.publicKey)) {
-        ownedChannels.push(res.publicKey)
-        localStore.set('ownedChannels', ownedChannels)
+        const ownedChannels = localStore.get('ownedChannels', [])
+        if (!ownedChannels.includes(res.publicKey)) {
+          ownedChannels.push(res.publicKey)
+          localStore.set('ownedChannels', ownedChannels)
+        }
+        localStore.set('ownChannelKey', res.publicKey)
+
+        getWindow()?.webContents.send('p2p-worker-message', {
+          type: 'channel-initialized',
+          publicKey: res.publicKey,
+          name: res.name
+        })
+        return res.publicKey
+      } catch (err: any) {
+        console.error('Channel init failed:', err)
+        throw err
       }
-      localStore.set('ownChannelKey', res.publicKey)
-
-      getWindow()?.webContents.send('p2p-worker-message', { type: 'channel-initialized', publicKey: res.publicKey, name: res.name })
-      return res.publicKey
-    } catch (err: any) {
-      console.error('Channel init failed:', err)
-      throw err
     }
-  })
+  )
 
   ipcMain.handle('channel:select-avatar', async () => {
     const result = await dialog.showOpenDialog({
@@ -61,7 +72,10 @@ export function registerChannelHandlers({ getWindow, getRpc, localStore }: IpcHa
 
   ipcMain.handle('feed:get', async () => {
     const res = await getRpc().getFeed({})
-    getWindow()?.webContents.send('p2p-worker-message', { type: 'feed-data', items: JSON.parse(res.itemsJson) })
+    getWindow()?.webContents.send('p2p-worker-message', {
+      type: 'feed-data',
+      items: JSON.parse(res.itemsJson)
+    })
   })
 
   ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'>) => {
