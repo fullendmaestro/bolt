@@ -122,6 +122,10 @@ function initP2PWorker(): void {
   worker.stderr.on('data', (err: Buffer) => {
     console.error('P2P Worker Err:', err.toString())
   })
+
+  worker.stdout.on('data', (data: Buffer) => {
+    console.log('P2P Worker Log:', data.toString())
+  })
 }
 
 // ── IPC Handlers ───────────────────────────────────────────
@@ -192,7 +196,7 @@ function setupHandlers(): void {
   ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
     try {
       const res = await rpc.initChannel({ name, description, avatarPath: avatarPath || '' })
-      
+
       const ownedChannels = localStore.get('ownedChannels', [])
       if (!ownedChannels.includes(res.publicKey)) {
         ownedChannels.push(res.publicKey)
@@ -281,7 +285,7 @@ function setupHandlers(): void {
       filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
     })
     if (result.canceled || !result.filePath) return { canceled: true }
-    
+
     rpc.downloadVideo({ channelKey, videoId, destinationPath: result.filePath })
       .then((res) => {
         win?.webContents.send('p2p-worker-message', { type: 'download-complete', videoId, channelKey, destinationPath: res.destinationPath })
