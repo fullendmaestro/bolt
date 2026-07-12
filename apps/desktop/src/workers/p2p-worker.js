@@ -1,5 +1,12 @@
 /* eslint-disable */
 // @ts-nocheck
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err)
+})
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+})
+
 const PearRuntime = require('pear-runtime')
 const Hyperswarm = require('hyperswarm')
 const Corestore = require('corestore')
@@ -21,18 +28,23 @@ const {
   ragIngest,
   ragSearch,
   plugins,
+  registerPlugin,
   PARAKEET_TDT_0_6B_V3_Q8_0,
   GTE_LARGE_FP16
 } = require('@qvac/bare-sdk')
 
 async function initAI() {
   try {
-    const parakeetModule = await import('@qvac/sdk/parakeet-transcription/plugin');
-    const embeddingsModule = await import('@qvac/sdk/llamacpp-embedding/plugin');
+    const parakeetModule = await import('@qvac/transcription-parakeet/plugin');
+    const embeddingsModule = await import('@qvac/embed-llamacpp/plugin');
 
     // Extract the actual plugin definition from the named exports Vite created
     const parakeet = parakeetModule.parakeetPlugin || parakeetModule.default || parakeetModule;
     const embeddings = embeddingsModule.embeddingsPlugin || embeddingsModule.default || embeddingsModule;
+
+    // Future plugins (e.g., @qvac/tts-onnx/plugin, @qvac/llm-llamacpp/plugin) should be registered here in the same way.
+    registerPlugin(parakeet);
+    registerPlugin(embeddings);
 
     // Register the unwrapped objects
     plugins([
@@ -47,7 +59,7 @@ async function initAI() {
 }
 
 // Ensure you call initAI() somewhere near the top of your worker lifecycle
-initAI();
+// initAI(); // Now awaited at the end of the file
 
 const pipe = Bare.IPC
 const rpc = new HRPC(pipe)
@@ -132,22 +144,66 @@ function getMimeType(filePath) {
 
 // ── RPC Handlers ──
 
+async function loadChannel(channelKey) {
+  if (channels.has(channelKey)) return;
+
+  const baseCore = store.get({ key: b4a.from(channelKey, 'hex') })
+  await baseCore.ready()
+
+  const autobase = new Autobase(store, baseCore.key, {
+    valueEncoding: 'json',
+    open: (viewStore) => viewStore.get({ name: 'channel-view', valueEncoding: 'json' }),
+    apply: async (nodes, view) => {
+      for (const { value } of nodes) {
+        if (value) await view.append(value)
+      }
+    }
+  })
+  await autobase.ready()
+
+  blinds.addAutobase(autobase)
+  
+  const isOwned = ownedChannels.has(channelKey)
+  swarm.join(baseCore.discoveryKey, { client: true, server: isOwned })
+
+  const channelData = {
+    baseCore,
+    autobase,
+    blobsCore: null,
+    blobs: null,
+    metadata: { name: 'Loading...', description: '', videos: [] },
+    videos: [],
+    events: []
+  }
+  channels.set(channelKey, channelData)
+
+  const stream = autobase.view.createReadStream({ live: true })
+  stream.on('data', (msg) => processAutobaseNode(channelKey, channelData, msg))
+
+  autobase.update()
+}
+
 rpc.onInitWorker(async (req) => {
+  const channelsToLoad = new Set()
+
   try {
     const appStateCore = store.get({ name: 'bolt-app-state' })
     await appStateCore.ready()
     const savedChannels = await appStateCore.getUserData('owned-channels')
     if (savedChannels) {
       const parsed = JSON.parse(savedChannels.toString())
-      parsed.forEach(k => ownedChannels.add(k))
+      parsed.forEach(k => { ownedChannels.add(k); channelsToLoad.add(k); })
     }
   } catch (err) {
     console.error('Failed to load owned channels', err)
   }
 
   if (req.ownedChannels) {
-    req.ownedChannels.forEach(k => ownedChannels.add(k))
+    req.ownedChannels.forEach(k => { ownedChannels.add(k); channelsToLoad.add(k); })
   }
+  
+  await Promise.all(Array.from(channelsToLoad).map(k => loadChannel(k)))
+
   return { success: true }
 })
 
@@ -235,41 +291,7 @@ rpc.onInitChannel(async (req) => {
 
 rpc.onJoinChannel(async (req) => {
   const { channelKey } = req
-  if (channels.has(channelKey)) return { channelKey }
-
-  const baseCore = store.get({ key: b4a.from(channelKey, 'hex') })
-  await baseCore.ready()
-
-  const autobase = new Autobase(store, baseCore.key, {
-    valueEncoding: 'json',
-    open: (viewStore) => viewStore.get({ name: 'channel-view', valueEncoding: 'json' }),
-    apply: async (nodes, view) => {
-      for (const { value } of nodes) {
-        if (value) await view.append(value)
-      }
-    }
-  })
-  await autobase.ready()
-
-  blinds.addAutobase(autobase)
-  swarm.join(baseCore.discoveryKey, { client: true, server: false })
-
-  const channelData = {
-    baseCore,
-    autobase,
-    blobsCore: null,
-    blobs: null,
-    metadata: { name: 'Loading...', description: '', videos: [] },
-    videos: [],
-    events: []
-  }
-  channels.set(channelKey, channelData)
-
-  const stream = autobase.view.createReadStream({ live: true })
-  stream.on('data', (msg) => processAutobaseNode(channelKey, channelData, msg))
-
-  autobase.update()
-
+  await loadChannel(channelKey)
   return { channelKey }
 })
 
@@ -291,7 +313,8 @@ async function processAutobaseNode(channelKey, channelData, msg) {
       channelData.blobs = new Hyperblobs(channelData.blobsCore)
 
       // Join the swarm to find peers hosting the media
-      swarm.join(channelData.blobsCore.discoveryKey, { client: true, server: false })
+      const isOwned = ownedChannels.has(channelKey)
+      swarm.join(channelData.blobsCore.discoveryKey, { client: true, server: isOwned })
 
       // Keep blobs available if blind peering is active
       if (typeof blinds !== 'undefined') blinds.addCore(channelData.blobsCore)
@@ -312,6 +335,7 @@ rpc.onLeaveChannel(async (req) => {
     const channel = channels.get(channelKey)
     if (channel.baseCore) await swarm.leave(channel.baseCore.discoveryKey)
     if (channel.blobsCore) await swarm.leave(channel.blobsCore.discoveryKey)
+    if (channel.autobase) await channel.autobase.close()
     await swarm.flush()
     channels.delete(channelKey)
   }
@@ -607,7 +631,7 @@ goodbye(async () => {
 })
 
 // ── Signal Readiness ──
-startBlobServer().then(() => {
+initAI().then(() => startBlobServer()).then(() => {
   rpc.workerReady({})
 }).catch(err => {
   console.error('Failed to start worker server:', err)

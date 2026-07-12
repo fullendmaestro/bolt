@@ -89,13 +89,13 @@ function initP2PWorker(): void {
 
   rpc = new HRPC(worker)
 
-  rpc.onWorkerReady(() => {
+  rpc.onWorkerReady(async () => {
     console.log('P2P Worker is ready')
-    rpc.initWorker({}).catch(console.error)
+    await rpc.initWorker({})
 
     const savedChannels = localStore.get('joinedChannels', [])
     for (const key of savedChannels) {
-      rpc.joinChannel({ channelKey: key }).catch(console.error)
+      await rpc.joinChannel({ channelKey: key }).catch(console.error)
     }
   })
 
@@ -192,6 +192,14 @@ function setupHandlers(): void {
   ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
     try {
       const res = await rpc.initChannel({ name, description, avatarPath: avatarPath || '' })
+      
+      const ownedChannels = localStore.get('ownedChannels', [])
+      if (!ownedChannels.includes(res.publicKey)) {
+        ownedChannels.push(res.publicKey)
+        localStore.set('ownedChannels', ownedChannels)
+      }
+      localStore.set('ownChannelKey', res.publicKey)
+
       win?.webContents.send('p2p-worker-message', { type: 'channel-initialized', publicKey: res.publicKey, name: res.name })
       return res.publicKey
     } catch (err: any) {
