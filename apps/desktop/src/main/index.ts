@@ -6,7 +6,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import Store from 'electron-store'
 const PearRuntime = require('pear-runtime')
 const HRPC = require('../shared/spec/hrpc/index.js')
-import { registerAiHandlers } from './ipc-handlers/ai-handlers'
+import { handleUploadComplete, registerAiHandlers } from './ipc-handlers/ai-handlers'
 import { registerChannelHandlers } from './ipc-handlers/channel-handlers'
 import { registerVideoHandlers } from './ipc-handlers/video-handlers'
 import type { StoreSchema, IpcHandlerContext } from './ipc-handlers/types'
@@ -17,6 +17,7 @@ app.commandLine.appendSwitch('no-sandbox')
 let win: BrowserWindow | null = null
 let modelId: string | null = null
 let rpc: any = null
+let handlerContext: IpcHandlerContext | null = null
 
 // --- Strict Instance Isolation ---
 // Parse custom user data directory for multi-peer local testing
@@ -106,6 +107,19 @@ function initP2PWorker(): void {
     })
   })
 
+  rpc.onUploadComplete(({ channelKey, videoJson }) => {
+    const video = JSON.parse(videoJson)
+    win?.webContents.send('p2p-worker-message', {
+      type: 'upload-complete',
+      channelKey,
+      video
+    })
+
+    if (handlerContext) {
+      void handleUploadComplete(handlerContext, channelKey, video)
+    }
+  })
+
   rpc.onDownloadProgress(({ videoId, channelKey, percent, bytesReceived, totalBytes }) => {
     win?.webContents.send('p2p-worker-message', {
       type: 'download-progress',
@@ -131,7 +145,7 @@ function initP2PWorker(): void {
 }
 
 function setupHandlers(): void {
-  const handlerContext: IpcHandlerContext = {
+  handlerContext = {
     getWindow: () => win,
     getRpc: () => rpc,
     getModelId: () => modelId,

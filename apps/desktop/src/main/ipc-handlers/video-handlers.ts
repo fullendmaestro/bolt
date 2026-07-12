@@ -13,6 +13,34 @@ export function registerVideoHandlers({ getWindow, getRpc }: IpcHandlerContext):
   })
 
   ipcMain.handle(
+    'video:upload',
+    async (
+      _event,
+      payload: {
+        filePath: string
+        title: string
+        duration: string
+        thumbnailPath?: string
+        matchData?: string
+        transcriptPath?: string
+        channelKey?: string
+      }
+    ) => {
+      getRpc()
+        .uploadVideo(payload)
+        .catch((err) => {
+          getWindow()?.webContents.send('p2p-worker-message', {
+            type: 'error',
+            message: err.message,
+            command: 'upload-video'
+          })
+        })
+
+      return { canceled: false }
+    }
+  )
+
+  ipcMain.handle(
     'video:select-and-upload',
     async (_event, title: string, thumbnailPath?: string) => {
       const result = await dialog.showOpenDialog({
@@ -33,12 +61,6 @@ export function registerVideoHandlers({ getWindow, getRpc }: IpcHandlerContext):
           duration: '0:00',
           thumbnailPath: thumbnailPath || '',
           channelKey: ''
-        })
-        .then((res) => {
-          getWindow()?.webContents.send('p2p-worker-message', {
-            type: 'upload-complete',
-            video: JSON.parse(res.videoJson)
-          })
         })
         .catch((err) => {
           getWindow()?.webContents.send('p2p-worker-message', {
