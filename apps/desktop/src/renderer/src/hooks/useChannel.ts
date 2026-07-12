@@ -36,65 +36,79 @@ export function useChannel() {
     window.qvacAPI.getUploads(key)
   }, [])
 
-  const fetchChannelsList = useCallback(async (selectKey?: string) => {
-    try {
-      const list = await window.qvacAPI.getChannels()
-      setChannelsList(list)
+  const fetchChannelsList = useCallback(
+    async (selectKey?: string) => {
+      try {
+        const list = await window.qvacAPI.getChannels()
+        setChannelsList(list)
 
-      let keyToSelect = selectKey || activeChannelKeyRef.current
-      if (!keyToSelect) {
-        if (list.owned.length > 0) keyToSelect = list.owned[list.owned.length - 1].publicKey
-        else if (list.joined.length > 0) keyToSelect = list.joined[list.joined.length - 1].publicKey
-      }
+        let keyToSelect = selectKey || activeChannelKeyRef.current
+        if (!keyToSelect) {
+          if (list.owned.length > 0) keyToSelect = list.owned[list.owned.length - 1].publicKey
+          else if (list.joined.length > 0)
+            keyToSelect = list.joined[list.joined.length - 1].publicKey
+        }
 
-      if (keyToSelect) {
-        handleSelectChannel(keyToSelect)
-      } else {
+        if (keyToSelect) {
+          handleSelectChannel(keyToSelect)
+        } else {
+          setLoading(false)
+        }
+      } catch (err) {
+        console.error('Failed to fetch channels:', err)
         setLoading(false)
       }
-    } catch (err) {
-      console.error('Failed to fetch channels:', err)
-      setLoading(false)
-    }
-  }, [handleSelectChannel])
+    },
+    [handleSelectChannel]
+  )
 
-  const handleP2PMessage = useCallback((msg: any) => {
-    if (msg.type === 'uploads-data') {
-      setChannelData(msg.channel || null)
-      setLoading(false)
-    } else if (msg.type === 'channel-initialized') {
-      setInitializing(false)
-      setShowInitModal(false)
-      setInitError(null)
-      toast.success('Channel created successfully!')
-      fetchChannelsList(msg.publicKey)
-    } else if (msg.type === 'error' && msg.command === 'init-channel') {
-      console.error('Channel init error:', msg.message)
-      setInitError(msg.message || 'Unknown error occurred')
-      toast.error(`Channel initialization failed: ${msg.message}`)
-      setInitializing(false)
-    }
-  }, [fetchChannelsList])
+  const handleP2PMessage = useCallback(
+    (msg: any) => {
+      if (msg.type === 'uploads-data') {
+        setChannelData(msg.channel || null)
+        setLoading(false)
+      } else if (msg.type === 'channel-initialized') {
+        setInitializing(false)
+        setShowInitModal(false)
+        setInitError(null)
+        toast.success('Channel created successfully!')
+        fetchChannelsList(msg.publicKey)
+      } else if (msg.type === 'error' && msg.command === 'init-channel') {
+        console.error('Channel init error:', msg.message)
+        setInitError(msg.message || 'Unknown error occurred')
+        toast.error(`Channel initialization failed: ${msg.message}`)
+        setInitializing(false)
+      }
+    },
+    [fetchChannelsList]
+  )
 
   useEffect(() => {
     setLoading(true)
     fetchChannelsList()
   }, [fetchChannelsList])
 
-  const handleInitSubmit = useCallback(async (e: FormEvent) => {
-    e.preventDefault()
-    if (!channelName.trim()) return
+  const handleInitSubmit = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault()
+      if (!channelName.trim()) return
 
-    setInitializing(true)
-    setInitError(null)
-    try {
-      await window.qvacAPI.initChannel(channelName.trim(), channelDesc.trim(), avatarPath || undefined)
-    } catch (err: any) {
-      console.error('Failed to init channel:', err)
-      setInitError(err.message || 'Failed to initialize channel')
-      setInitializing(false)
-    }
-  }, [avatarPath, channelDesc, channelName])
+      setInitializing(true)
+      setInitError(null)
+      try {
+        await window.qvacAPI.initChannel(
+          channelName.trim(),
+          channelDesc.trim(),
+          avatarPath || undefined
+        )
+      } catch (err: any) {
+        console.error('Failed to init channel:', err)
+        setInitError(err.message || 'Failed to initialize channel')
+        setInitializing(false)
+      }
+    },
+    [avatarPath, channelDesc, channelName]
+  )
 
   const handleSelectAvatar = useCallback(async () => {
     try {
@@ -123,7 +137,9 @@ export function useChannel() {
     })
   }, [])
 
-  const isCurrentChannelOwned = channelsList.owned.some((channel) => channel.publicKey === activeChannelKey)
+  const isCurrentChannelOwned = channelsList.owned.some(
+    (channel) => channel.publicKey === activeChannelKey
+  )
 
   return {
     channelData,
@@ -150,6 +166,6 @@ export function useChannel() {
     handleSelectAvatar,
     handleCopyKey,
     appendVideo,
-    isCurrentChannelOwned,
+    isCurrentChannelOwned
   }
 }

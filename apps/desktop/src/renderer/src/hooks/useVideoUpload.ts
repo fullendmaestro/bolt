@@ -29,23 +29,26 @@ export function useVideoUpload({ onUploadComplete }: UseVideoUploadOptions = {})
     setShowUploadModal(false)
   }, [])
 
-  const handleP2PMessage = useCallback((msg: any) => {
-    if (msg.type === 'upload-progress') {
-      setUploadProgress(msg.percent)
-      setUploadBytesReceived(msg.bytesReceived || 0)
-      setUploadTotalBytes(msg.totalBytes || 0)
-    } else if (msg.type === 'upload-complete') {
-      onUploadComplete?.(msg.video)
-      resetUploadProgress()
-      setThumbnailPath(null)
-      setThumbnailPreview(null)
-      toast.success('Video uploaded successfully!')
-    } else if (msg.type === 'error' && msg.command === 'upload-video') {
-      console.error('Upload error:', msg.message)
-      toast.error(`Upload failed: ${msg.message}`)
-      setUploading(false)
-    }
-  }, [onUploadComplete, resetUploadProgress])
+  const handleP2PMessage = useCallback(
+    (msg: any) => {
+      if (msg.type === 'upload-progress') {
+        setUploadProgress(msg.percent)
+        setUploadBytesReceived(msg.bytesReceived || 0)
+        setUploadTotalBytes(msg.totalBytes || 0)
+      } else if (msg.type === 'upload-complete') {
+        onUploadComplete?.(msg.video)
+        resetUploadProgress()
+        setThumbnailPath(null)
+        setThumbnailPreview(null)
+        toast.success('Video uploaded successfully!')
+      } else if (msg.type === 'error' && msg.command === 'upload-video') {
+        console.error('Upload error:', msg.message)
+        toast.error(`Upload failed: ${msg.message}`)
+        setUploading(false)
+      }
+    },
+    [onUploadComplete, resetUploadProgress]
+  )
 
   const handleSelectThumbnail = useCallback(async () => {
     try {
@@ -95,6 +98,6 @@ export function useVideoUpload({ onUploadComplete }: UseVideoUploadOptions = {})
     handleP2PMessage,
     handleSelectThumbnail,
     handleSelectAndUpload,
-    resetUploadProgress,
+    resetUploadProgress
   }
 }

@@ -36,7 +36,7 @@ export function useFeed() {
         time: new Date(item.video.timestamp).toLocaleDateString(),
         duration: item.video.duration,
         channelKey: item.channelKey,
-        videoId: item.video.id,
+        videoId: item.video.id
       })),
     [feedItems]
   )
@@ -92,6 +92,6 @@ export function useFeed() {
     setChannelKeyInput,
     joining,
     handleJoinChannel,
-    refreshFeed,
+    refreshFeed
   }
 }
