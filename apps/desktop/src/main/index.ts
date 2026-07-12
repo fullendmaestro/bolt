@@ -1,18 +1,15 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
+import { app, BrowserWindow, protocol, net } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import {
-  LLAMA_3_2_1B_INST_Q4_0,
-  loadModel,
-  unloadModel,
-  completion
-} from '@qvac/sdk'
 import Store from 'electron-store'
-import type { ChannelEvent } from '../shared/types'
 const PearRuntime = require('pear-runtime')
 const HRPC = require('../shared/spec/hrpc/index.js')
+import { registerAiHandlers } from './ipc-handlers/ai-handlers'
+import { registerChannelHandlers } from './ipc-handlers/channel-handlers'
+import { registerVideoHandlers } from './ipc-handlers/video-handlers'
+import type { StoreSchema, IpcHandlerContext } from './ipc-handlers/types'
 
 app.commandLine.appendSwitch('no-sandbox')
 
@@ -35,12 +32,6 @@ if (userDataArg) {
 // ---------------------------------
 
 // ── Local Persistence ──────────────────────────────────────
-interface StoreSchema {
-  joinedChannels: string[]
-  ownChannelKey: string | null
-  ownedChannels: string[]
-}
-
 const localStore = new Store<StoreSchema>({
   defaults: {
     joinedChannels: [],
@@ -128,183 +119,20 @@ function initP2PWorker(): void {
   })
 }
 
-// ── IPC Handlers ───────────────────────────────────────────
 function setupHandlers(): void {
-  // ── QVAC AI Handlers ──────────────────────────────────
-  ipcMain.handle('load-model', async () => {
-    modelId = await loadModel({
-      modelSrc: LLAMA_3_2_1B_INST_Q4_0,
-      modelType: 'llm',
-      onProgress: (progress) => {
-        console.log(progress)
-        win?.webContents.send('model-progress', progress)
-      }
-    })
-    return 'model loaded'
-  })
+  const handlerContext: IpcHandlerContext = {
+    getWindow: () => win,
+    getRpc: () => rpc,
+    getModelId: () => modelId,
+    setModelId: (nextModelId) => {
+      modelId = nextModelId
+    },
+    localStore,
+  }
 
-  ipcMain.handle('infer', async (_event, history, options = {}) => {
-    if (!modelId) throw new Error('Model not loaded.')
-
-    const result = completion({ modelId, history, stream: true, ...options })
-    for await (const token of result.tokenStream) {
-      win?.webContents.send('completion-stream', token)
-    }
-    win?.webContents.send('completion-stream', '')
-  })
-
-  ipcMain.handle('unload-model', async () => {
-    if (!modelId) throw new Error('Model not loaded.')
-    await unloadModel({ modelId })
-    modelId = null
-    return 'model unloaded'
-  })
-
-  ipcMain.handle('rag:query', async (_event, workspaceId: string, query: string) => {
-    const res = await rpc.ragQuery({ workspaceId, query })
-    return JSON.parse(res.resultsJson)
-  })
-
-  // ── Channel Subscription Handlers ─────────────────────
-  ipcMain.handle('channel:join', async (_event, channelKey: string) => {
-    const channels = localStore.get('joinedChannels', [])
-    if (!channels.includes(channelKey)) {
-      channels.push(channelKey)
-      localStore.set('joinedChannels', channels)
-    }
-    await rpc.joinChannel({ channelKey })
-  })
-
-  ipcMain.handle('channel:leave', async (_event, channelKey: string) => {
-    const channels = localStore.get('joinedChannels', [])
-    localStore.set(
-      'joinedChannels',
-      channels.filter((k) => k !== channelKey)
-    )
-    await rpc.leaveChannel({ channelKey })
-  })
-
-  ipcMain.handle('channel:list', async () => {
-    return localStore.get('joinedChannels', [])
-  })
-
-  ipcMain.handle('channels:get', async () => {
-    const res = await rpc.getChannels({})
-    return JSON.parse(res.channelsJson)
-  })
-
-  ipcMain.handle('channel:init', async (_event, name: string, description: string, avatarPath?: string) => {
-    try {
-      const res = await rpc.initChannel({ name, description, avatarPath: avatarPath || '' })
-
-      const ownedChannels = localStore.get('ownedChannels', [])
-      if (!ownedChannels.includes(res.publicKey)) {
-        ownedChannels.push(res.publicKey)
-        localStore.set('ownedChannels', ownedChannels)
-      }
-      localStore.set('ownChannelKey', res.publicKey)
-
-      win?.webContents.send('p2p-worker-message', { type: 'channel-initialized', publicKey: res.publicKey, name: res.name })
-      return res.publicKey
-    } catch (err: any) {
-      console.error('Channel init failed:', err)
-      throw err
-    }
-  })
-
-  // ── Avatar / Thumbnail Selectors ──────────────────────
-  ipcMain.handle('channel:select-avatar', async () => {
-    const result = await dialog.showOpenDialog({
-      title: 'Select Channel Avatar',
-      properties: ['openFile'],
-      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
-    })
-    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
-    return { canceled: false, filePath: result.filePaths[0] }
-  })
-
-  ipcMain.handle('video:select-thumbnail', async () => {
-    const result = await dialog.showOpenDialog({
-      title: 'Select Video Thumbnail',
-      properties: ['openFile'],
-      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
-    })
-    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
-    return { canceled: false, filePath: result.filePaths[0] }
-  })
-
-  // ── Feed Handler ──────────────────────────────────────
-  ipcMain.handle('feed:get', async () => {
-    const res = await rpc.getFeed({})
-    win?.webContents.send('p2p-worker-message', { type: 'feed-data', items: JSON.parse(res.itemsJson) })
-  })
-
-  // ── Upload Handlers ───────────────────────────────────
-  ipcMain.handle('video:select-and-upload', async (_event, title: string, thumbnailPath?: string) => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
-    })
-
-    if (result.canceled || result.filePaths.length === 0) {
-      return { canceled: true }
-    }
-
-    const filePath = result.filePaths[0]
-
-    rpc.uploadVideo({
-      filePath,
-      title: title || 'Untitled Upload',
-      duration: '0:00',
-      thumbnailPath: thumbnailPath || '',
-      channelKey: ''
-    }).then((res) => {
-      win?.webContents.send('p2p-worker-message', { type: 'upload-complete', video: JSON.parse(res.videoJson) })
-    }).catch((err) => {
-      win?.webContents.send('p2p-worker-message', { type: 'error', message: err.message, command: 'upload-video' })
-    })
-    return { canceled: false, filePath }
-  })
-
-  ipcMain.handle('uploads:get', async (_event, channelKey?: string) => {
-    const res = await rpc.getUploads({ channelKey: channelKey || '' })
-    win?.webContents.send('p2p-worker-message', { type: 'uploads-data', channel: JSON.parse(res.channelJson) })
-  })
-
-  // ── Streaming Handler ─────────────────────────────────
-  ipcMain.handle('stream:start', async (_event, channelKey: string, videoId: string) => {
-    const res = await rpc.startStream({ channelKey, videoId })
-    win?.webContents.send('p2p-worker-message', { type: 'stream-url', url: res.url, channelKey: res.channelKey, videoId: res.videoId })
-  })
-
-  // ── Download & Seed Handler ───────────────────────────
-  ipcMain.handle('video:download', async (_event, channelKey: string, videoId: string) => {
-    const result = await dialog.showSaveDialog({
-      title: 'Save Video',
-      defaultPath: videoId + '.mp4',
-      filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
-    })
-    if (result.canceled || !result.filePath) return { canceled: true }
-
-    rpc.downloadVideo({ channelKey, videoId, destinationPath: result.filePath })
-      .then((res) => {
-        win?.webContents.send('p2p-worker-message', { type: 'download-complete', videoId, channelKey, destinationPath: res.destinationPath })
-      })
-      .catch((err) => {
-        win?.webContents.send('p2p-worker-message', { type: 'error', message: err.message, command: 'download-video' })
-      })
-    return { canceled: false, destinationPath: result.filePath }
-  })
-
-  // ── Event Injection Handler ───────────────────────────
-  ipcMain.handle('event:inject', async (_event, eventData: Omit<ChannelEvent, 'channelKey'>) => {
-    await rpc.injectEvent({ channelKey: '', eventJson: JSON.stringify(eventData) })
-  })
-
-  // ── Legacy P2P Send (backward compatibility) ──────────
-  ipcMain.handle('p2p-send', async (_event, payload) => {
-    console.warn('Legacy p2p-send called, payload ignored:', payload)
-  })
+  registerAiHandlers(handlerContext)
+  registerChannelHandlers(handlerContext)
+  registerVideoHandlers(handlerContext)
 }
 
 // ── App Lifecycle ──────────────────────────────────────────
