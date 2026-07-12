@@ -12,7 +12,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
     "start": "electron-vite preview -- --no-sandbox",
-    "dev": "electron-vite dev -- --no-sandbox",
+    "dev": "electron-vite dev -- --no-sandbox -- --user-data-dir=./.data/dev",
     "dev:pear1": "electron-vite dev -- --no-sandbox -- --user-data-dir=./.data/pear1",
     "dev:pear2": "sleep 10 && ELECTRON_RENDERER_URL=http://localhost:5173 electron . --no-sandbox --user-data-dir=./.data/pear2",
     "dev:pear3": "sleep 12 && ELECTRON_RENDERER_URL=http://localhost:5173 electron . --no-sandbox --user-data-dir=./.data/pear3",
