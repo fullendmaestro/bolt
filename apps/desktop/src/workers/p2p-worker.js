@@ -1,11 +1,8 @@
 /* eslint-disable */
 // @ts-nocheck
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err)
-})
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-})
+Bare.on('uncaughtException', (err) => { console.error('Uncaught Exception:', err) })
+Bare.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason) })
+
 
 const PearRuntime = require('pear-runtime')
 const Hyperswarm = require('hyperswarm')
@@ -35,16 +32,12 @@ const {
 
 async function initAI() {
   try {
-    const parakeetModule = await import('@qvac/transcription-parakeet/plugin');
-    const embeddingsModule = await import('@qvac/embed-llamacpp/plugin');
+    const parakeetModule = await import('@qvac/sdk/parakeet-transcription/plugin');
+    const embeddingsModule = await import('@qvac/sdk/llamacpp-embedding/plugin');
 
     // Extract the actual plugin definition from the named exports Vite created
     const parakeet = parakeetModule.parakeetPlugin || parakeetModule.default || parakeetModule;
     const embeddings = embeddingsModule.embeddingsPlugin || embeddingsModule.default || embeddingsModule;
-
-    // Future plugins (e.g., @qvac/tts-onnx/plugin, @qvac/llm-llamacpp/plugin) should be registered here in the same way.
-    registerPlugin(parakeet);
-    registerPlugin(embeddings);
 
     // Register the unwrapped objects
     plugins([
@@ -57,9 +50,6 @@ async function initAI() {
     console.error("Failed to initialize AI plugins:", err);
   }
 }
-
-// Ensure you call initAI() somewhere near the top of your worker lifecycle
-// initAI(); // Now awaited at the end of the file
 
 const pipe = Bare.IPC
 const rpc = new HRPC(pipe)
@@ -162,7 +152,7 @@ async function loadChannel(channelKey) {
   await autobase.ready()
 
   blinds.addAutobase(autobase)
-  
+
   const isOwned = ownedChannels.has(channelKey)
   swarm.join(baseCore.discoveryKey, { client: true, server: isOwned })
 
@@ -201,7 +191,7 @@ rpc.onInitWorker(async (req) => {
   if (req.ownedChannels) {
     req.ownedChannels.forEach(k => { ownedChannels.add(k); channelsToLoad.add(k); })
   }
-  
+
   await Promise.all(Array.from(channelsToLoad).map(k => loadChannel(k)))
 
   return { success: true }
