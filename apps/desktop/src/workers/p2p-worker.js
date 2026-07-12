@@ -32,14 +32,12 @@ const {
 
 async function initAI() {
   try {
-    const parakeetModule = await import('@qvac/sdk/parakeet-transcription/plugin');
-    const embeddingsModule = await import('@qvac/sdk/llamacpp-embedding/plugin');
+    const parakeetModule = await import('@qvac/bare-sdk/parakeet-transcription/plugin');
+    const embeddingsModule = await import('@qvac/bare-sdk/llamacpp-embedding/plugin');
 
-    // Extract the actual plugin definition from the named exports Vite created
     const parakeet = parakeetModule.parakeetPlugin || parakeetModule.default || parakeetModule;
     const embeddings = embeddingsModule.embeddingsPlugin || embeddingsModule.default || embeddingsModule;
 
-    // Register the unwrapped objects
     plugins([
       parakeet,
       embeddings
