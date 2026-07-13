@@ -3,6 +3,16 @@
 // Shared between Renderer, Main Process, and Bare Worker
 // ============================================================
 
+/** User-supplied match timeline event (included at upload time) */
+export interface VideoTimelineEvent {
+  /** Short label e.g. "Goal", "Red Card" */
+  label: string
+  /** Human-readable timestamp string e.g. "45:00" */
+  timestamp: string
+  /** Seconds into the video for programmatic seeking */
+  videoTimeSecs: number
+}
+
 /** A single video entry stored inside a Channel's Hyperdrive metadata */
 export interface VideoEntry {
   /** Unique video identifier (UUID) */
@@ -23,6 +33,16 @@ export interface VideoEntry {
   isLive: boolean
   /** Hyperdrive path to the video thumbnail image (optional) */
   thumbnailPath?: string
+  /** Video type: 'full_tournament' | 'clip' */
+  videoType?: string
+  /** Opponent team identifier (see OPPONENTS constant) */
+  opponentId?: string
+  /** Match score string e.g. "2-1" */
+  score?: string
+  /** Absolute path to a pre-existing transcript file (skips Parakeet) */
+  transcriptPath?: string
+  /** Serialized JSON array of VideoTimelineEvent — user-supplied at upload */
+  eventsJson?: string
 }
 
 /** Metadata for a Channel (a user's persistent Hyperdrive) */
