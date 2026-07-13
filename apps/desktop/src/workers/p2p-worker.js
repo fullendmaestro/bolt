@@ -23,9 +23,7 @@ const BlindPeering = require('blind-peering')
 const {
   loadModel,
   transcribe,
-  ragChunk,
-  embed,
-  ragSaveEmbeddings,
+  ragIngest,
   ragSearch,
   startQVACProvider,
   plugins,
@@ -543,10 +541,12 @@ rpc.onUploadVideo(async (req) => {
       console.log('[Bolt Worker] Transcription complete.')
     }
 
-    // Segregated RAG pipeline: chunk → embed → save
-    const chunks = await ragChunk({ text: transcriptText })
-    const embeddings = await embed({ modelId: embedModelId, text: chunks })
-    await ragSaveEmbeddings({ workspaceId, embeddings })
+    // Integrated RAG pipeline
+    await ragIngest({
+      workspace: workspaceId,
+      modelId: embedModelId,
+      documents: [transcriptText]
+    })
     console.log('[Bolt Worker] RAG embeddings saved for workspace:', workspaceId)
 
   } catch (err) {
