@@ -10,10 +10,13 @@ import {
   Check,
   FileVideo,
   ImagePlus,
+  FileText,
   X,
   Plus,
+  Trash2,
 } from 'lucide-react'
-import type { ChannelMetadata, VideoEntry } from '../../../shared/types'
+import type { ChannelMetadata, VideoEntry, VideoTimelineEvent } from '../../../shared/types'
+import { VIDEO_TYPES, OPPONENTS } from '../../../shared/constants'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,6 +59,12 @@ export function Studio() {
   // Upload state
   const [thumbnailPath, setThumbnailPath] = useState<string | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+  // New metadata fields
+  const [videoType, setVideoType] = useState<string>(VIDEO_TYPES.FULL_TOURNAMENT)
+  const [opponentId, setOpponentId] = useState<string>('')
+  const [score, setScore] = useState<string>('')
+  const [transcriptPath, setTranscriptPath] = useState<string | null>(null)
+  const [timelineEvents, setTimelineEvents] = useState<VideoTimelineEvent[]>([])
 
   const fetchChannelsList = async (selectKey?: string) => {
     try {
@@ -179,21 +188,50 @@ export function Studio() {
     }
   }
 
+  const handleSelectTranscript = async () => {
+    try {
+      const result = await window.qvacAPI.selectTranscript()
+      if (!result.canceled && result.filePath) {
+        setTranscriptPath(result.filePath)
+        toast.success('Transcript selected — Parakeet will be skipped')
+      }
+    } catch (err) {
+      console.error('Transcript selection failed:', err)
+    }
+  }
+
+  const addTimelineEvent = () =>
+    setTimelineEvents(prev => [...prev, { label: '', timestamp: '', videoTimeSecs: 0 }])
+
+  const removeTimelineEvent = (i: number) =>
+    setTimelineEvents(prev => prev.filter((_, idx) => idx !== i))
+
+  const updateTimelineEvent = (i: number, field: keyof VideoTimelineEvent, value: string | number) =>
+    setTimelineEvents(prev => prev.map((evt, idx) => idx === i ? { ...evt, [field]: value } : evt))
+
   const handleSelectAndUpload = async () => {
     setUploading(true)
     try {
-      const result = await window.qvacAPI.selectAndUploadVideo(
-        uploadTitle || 'Untitled Upload',
-        thumbnailPath || undefined
-      )
+      const result = await window.qvacAPI.selectAndUploadVideo({
+        title: uploadTitle || 'Untitled Upload',
+        thumbnailPath: thumbnailPath || undefined,
+        videoType,
+        opponentId: opponentId || undefined,
+        score: score || undefined,
+        transcriptPath: transcriptPath || undefined,
+        eventsJson: timelineEvents.length > 0 ? JSON.stringify(timelineEvents) : undefined,
+      })
       if (result.canceled) {
         setUploading(false)
       } else {
-        // Reset thumbnail after initiating upload
+        // Reset metadata after initiating upload
         setThumbnailPath(null)
         setThumbnailPreview(null)
+        setTranscriptPath(null)
+        setTimelineEvents([])
+        setScore('')
+        setOpponentId('')
       }
-      // Upload progress will come via worker messages
     } catch (err) {
       console.error('Upload failed:', err)
       setUploading(false)
@@ -317,20 +355,22 @@ export function Studio() {
       {/* Upload Video Modal */}
       <Dialog open={showUploadModal} onOpenChange={(open) => {
         if (uploading && !open) {
-          toast.error('Please wait for the upload to finish or cancel it.')
+          toast.error('Please wait for the upload to finish.')
           return
         }
         setShowUploadModal(open)
       }}>
-        <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-neutral-800 text-white">
+        <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto bg-[#1a1a1a] border-neutral-800 text-white">
           <DialogHeader>
             <DialogTitle>Upload to {channelData?.name}</DialogTitle>
             <DialogDescription className="text-neutral-400">
-              Seed a new video to your local corestore. You remain the sole owner of your data.
+              Seed a new video and provide match metadata for the AI assistant.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-5 py-4">
+
+            {/* Title */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-neutral-400 uppercase">Video Title</label>
               <Input
@@ -342,6 +382,7 @@ export function Studio() {
               />
             </div>
 
+            {/* Thumbnail */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-semibold text-neutral-400 uppercase">Thumbnail</label>
               <div className="flex items-center gap-3">
@@ -362,29 +403,155 @@ export function Studio() {
                     <ImagePlus className="h-5 w-5 text-neutral-600" />
                   </div>
                 )}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleSelectThumbnail}
-                  disabled={uploading}
-                  className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs"
-                >
-                  {thumbnailPreview ? 'Change Thumbnail' : 'Add Thumbnail'}
+                <Button type="button" variant="secondary" onClick={handleSelectThumbnail} disabled={uploading}
+                  className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs">
+                  {thumbnailPreview ? 'Change' : 'Add Thumbnail'}
                 </Button>
               </div>
             </div>
 
+            {/* Divider: Match Metadata */}
+            <div className="border-t border-neutral-800 pt-2">
+              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Match Metadata</p>
+
+              {/* Video Type */}
+              <div className="flex flex-col gap-2 mb-3">
+                <label className="text-xs font-semibold text-neutral-400 uppercase">Video Type</label>
+                <div className="flex gap-2">
+                  {Object.entries(VIDEO_TYPES).map(([key, val]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setVideoType(val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        videoType === val
+                          ? 'bg-indigo-500/20 border-indigo-500/60 text-indigo-300'
+                          : 'bg-[#0F0F0F] border-neutral-700 text-neutral-400 hover:border-neutral-500'
+                      }`}
+                    >
+                      {key === 'FULL_TOURNAMENT' ? 'Full Match' : 'Clip'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Opponent + Score row */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-neutral-400 uppercase">Opponent</label>
+                  <select
+                    value={opponentId}
+                    onChange={(e) => setOpponentId(e.target.value)}
+                    disabled={uploading}
+                    className="bg-[#0F0F0F] border border-neutral-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="">None / Custom</option>
+                    {Object.values(OPPONENTS).map(opp => (
+                      <option key={opp.id} value={opp.id}>{opp.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-neutral-400 uppercase">Score</label>
+                  <Input
+                    value={score}
+                    onChange={(e) => setScore(e.target.value)}
+                    placeholder="e.g. 2-1"
+                    disabled={uploading}
+                    className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Transcript */}
+              <div className="flex flex-col gap-2 mb-1">
+                <label className="text-xs font-semibold text-neutral-400 uppercase">Transcript (optional)</label>
+                <div className="flex items-center gap-3">
+                  <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-xs truncate ${
+                    transcriptPath ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-300' : 'border-neutral-700 bg-[#0F0F0F] text-neutral-500'
+                  }`}>
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{transcriptPath ? transcriptPath.split('/').pop() : 'No file selected — Parakeet will auto-transcribe'}</span>
+                  </div>
+                  <Button type="button" variant="secondary" onClick={handleSelectTranscript} disabled={uploading}
+                    className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs shrink-0">
+                    Browse
+                  </Button>
+                  {transcriptPath && (
+                    <button onClick={() => setTranscriptPath(null)} className="text-neutral-500 hover:text-neutral-300">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Timeline Events */}
+            <div className="border-t border-neutral-800 pt-2">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Match Timeline</p>
+                <button
+                  type="button"
+                  onClick={addTimelineEvent}
+                  disabled={uploading}
+                  className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-40"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Event
+                </button>
+              </div>
+
+              {timelineEvents.length === 0 ? (
+                <p className="text-xs text-neutral-600 italic">No events added. Events appear in the video stats timeline.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {timelineEvents.map((evt, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_80px_80px_auto] gap-2 items-center">
+                      <Input
+                        value={evt.label}
+                        onChange={(e) => updateTimelineEvent(i, 'label', e.target.value)}
+                        placeholder="Label (e.g. Goal)"
+                        disabled={uploading}
+                        className="bg-[#0F0F0F] border-neutral-700 text-white text-xs focus-visible:ring-indigo-500 h-8"
+                      />
+                      <Input
+                        value={evt.timestamp}
+                        onChange={(e) => updateTimelineEvent(i, 'timestamp', e.target.value)}
+                        placeholder="45:00"
+                        disabled={uploading}
+                        className="bg-[#0F0F0F] border-neutral-700 text-white text-xs focus-visible:ring-indigo-500 h-8"
+                      />
+                      <Input
+                        type="number"
+                        value={evt.videoTimeSecs}
+                        onChange={(e) => updateTimelineEvent(i, 'videoTimeSecs', Number(e.target.value))}
+                        placeholder="secs"
+                        disabled={uploading}
+                        className="bg-[#0F0F0F] border-neutral-700 text-white text-xs focus-visible:ring-indigo-500 h-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeTimelineEvent(i)}
+                        disabled={uploading}
+                        className="text-neutral-600 hover:text-red-400 transition-colors disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-neutral-600 mt-1">Columns: Label · Display timestamp · Seconds from video start</p>
+                </div>
+              )}
+            </div>
+
+            {/* Upload Progress */}
             {uploading && (
-              <div className="mt-4 p-4 bg-neutral-900 rounded-lg border border-neutral-800">
+              <div className="p-4 bg-neutral-900 rounded-lg border border-neutral-800">
                 <div className="flex justify-between text-xs text-neutral-400 mb-2">
                   <span>Uploading to Corestore...</span>
                   <span className="font-mono">{uploadProgress}%</span>
                 </div>
                 <div className="w-full bg-neutral-800 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-indigo-500 h-full transition-all duration-300 ease-out"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
+                  <div className="bg-indigo-500 h-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }} />
                 </div>
                 <div className="text-right text-[10px] text-neutral-500 mt-1 font-mono">
                   {(uploadBytesReceived / 1024 / 1024).toFixed(1)} MB / {(uploadTotalBytes / 1024 / 1024).toFixed(1)} MB
@@ -394,28 +561,15 @@ export function Studio() {
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowUploadModal(false)}
-              disabled={uploading}
-              className="hover:bg-neutral-800 hover:text-white text-neutral-300"
-            >
+            <Button type="button" variant="ghost" onClick={() => setShowUploadModal(false)} disabled={uploading}
+              className="hover:bg-neutral-800 hover:text-white text-neutral-300">
               Cancel
             </Button>
-            <Button
-              onClick={handleSelectAndUpload}
-              disabled={uploading}
-              className="bg-white text-black hover:bg-neutral-200 disabled:opacity-50"
-            >
+            <Button onClick={handleSelectAndUpload} disabled={uploading}
+              className="bg-white text-black hover:bg-neutral-200 disabled:opacity-50">
               {uploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Select File & Upload'
-              )}
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>
+              ) : 'Select File & Upload'}
             </Button>
           </DialogFooter>
         </DialogContent>
