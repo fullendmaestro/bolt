@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('qvacAPI', {
   // ── AI APIs ───────────────────────────────────────────────
-  loadModel: () => ipcRenderer.invoke('load-model'),
+  loadModel: (options?: object) => ipcRenderer.invoke('load-model', options),
   infer: (history, options) => ipcRenderer.invoke('infer', history, options),
   unloadModel: () => ipcRenderer.invoke('unload-model'),
   onCompletionStream: (cb) =>
@@ -12,6 +12,48 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   removeModelProgressListener: () =>
     ipcRenderer.removeAllListeners('model-progress'),
   ragQuery: (workspaceId: string, query: string) => ipcRenderer.invoke('rag:query', workspaceId, query),
+
+  /**
+   * completion() — wraps the IPC infer channel with a streaming AsyncIterable.
+   * The main process fires 'completion-stream' events; a '' token signals end-of-stream.
+   * tool-call events are signalled via 'completion-tool-call'.
+   */
+  completion: (options: object) => ipcRenderer.invoke('completion', options).then(() => {
+    // Build an AsyncIterable over IPC events
+    const events: any[] = []
+    let resolve: (() => void) | null = null
+    let done = false
+
+    ipcRenderer.on('completion-stream', (_ev, token: string) => {
+      if (token === '') {
+        done = true
+      } else {
+        events.push({ type: 'contentDelta', text: token })
+      }
+      resolve?.()
+      resolve = null
+    })
+
+    ipcRenderer.on('completion-tool-call', (_ev, toolCall: any) => {
+      events.push({ type: 'toolCall', toolCall })
+      resolve?.()
+      resolve = null
+    })
+
+    async function* gen() {
+      while (!done || events.length > 0) {
+        if (events.length > 0) {
+          yield events.shift()
+        } else {
+          await new Promise<void>((r) => { resolve = r })
+        }
+      }
+      ipcRenderer.removeAllListeners('completion-stream')
+      ipcRenderer.removeAllListeners('completion-tool-call')
+    }
+
+    return { events: gen() }
+  }),
 
   // ── Channel Management ────────────────────────────────────
   joinChannel: (channelKey: string) => ipcRenderer.invoke('channel:join', channelKey),
