@@ -5,7 +5,6 @@ import {
   ChevronDown,
   MessageSquare,
   BarChart2,
-  Bot,
   Shield,
   Cpu,
   type LucideIcon,
@@ -13,7 +12,7 @@ import {
 
 import { Thread } from './assistant-ui/thread'
 import type { VideoEntry, VideoTimelineEvent } from '../../../shared/types'
-import { OPPONENTS, VIDEO_TYPES, getOpponentById } from '../../../shared/constants'
+import { VIDEO_TYPES, getOpponentById } from '../../../shared/constants'
 
 // ── Delegate types ──────────────────────────────────────────
 

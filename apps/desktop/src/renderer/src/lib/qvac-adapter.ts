@@ -2,8 +2,11 @@ import { ChatModelAdapter } from "@assistant-ui/react"
 import type { ChannelEvent } from "../../../shared/types"
 
 /**
- * Creates a QVAC model adapter that injects live channel events as system context.
- * The channelEventsRef is a mutable ref that accumulates events from the P2P worker.
+ * Creates a QVAC model adapter that:
+ * 1. Injects live channel events as system context.
+ * 2. Exposes a `search_video_transcript` tool so the LLM can actively query the
+ *    RAG workspace of whichever video is currently playing.
+ * 3. Feeds tool results back into the completion context and streams the final answer.
  */
 export function createQvacModelAdapter(
     channelEventsRef: React.RefObject<ChannelEvent[]>,
@@ -11,86 +14,114 @@ export function createQvacModelAdapter(
 ): ChatModelAdapter {
     return {
         async *run({ messages, abortSignal }) {
-            // 1. Format assistant-ui messages for QVAC inference
+            // 1. Format messages for QVAC
             const history = messages.map((msg) => {
-                // FIX: Safely extract text from the strongly-typed message parts array
                 const textContent = msg.content
                     .map((part) => (part.type === "text" ? part.text : ""))
                     .join("")
-
                 return { role: msg.role, content: textContent }
             })
 
-            const latestUserMessage = history.filter(m => m.role === 'user').pop()?.content || ""
-
             // 2. Build system prompt with channel event context
-            let systemPrompt = "You are a helpful sports AI assistant for the Bolt P2P streaming platform. You help users with sports analysis, commentary, and questions about what's happening in the stream."
-
-            if (currentVideoWorkspaceId && latestUserMessage) {
-                try {
-                    const ragResults = await window.qvacAPI.ragQuery(currentVideoWorkspaceId, latestUserMessage)
-                    if (ragResults && ragResults.length > 0) {
-                        const ragContext = ragResults.map((r: any) => r.content).join("\n\n")
-                        systemPrompt += `\n\n--- VIDEO TRANSCRIPT CONTEXT ---\n${ragContext}\n--- END TRANSCRIPT ---\n\nUse this context to answer questions about the video.`
-                    }
-                } catch (err) {
-                    console.error("RAG Query failed:", err)
-                }
-            }
+            let systemPrompt =
+                "You are a helpful sports AI assistant for the Bolt P2P streaming platform. " +
+                "You help users with sports analysis, commentary, and questions about what's happening in the stream."
 
             const events = channelEventsRef.current || []
             if (events.length > 0) {
                 const eventContext = events
                     .map((evt) => `[${evt.timestamp}] ${evt.eventType}: ${evt.description}`)
                     .join("\n")
-
-                systemPrompt += `\n\n--- LIVE CHANNEL EVENTS (real-time context from the broadcast) ---\n${eventContext}\n--- END EVENTS ---\n\nUse the above events to provide contextual, real-time answers about what is happening in the stream. Reference specific events when relevant.`
+                systemPrompt +=
+                    `\n\n--- LIVE CHANNEL EVENTS ---\n${eventContext}\n--- END EVENTS ---\n` +
+                    `\nUse the above events to provide contextual, real-time answers about the stream.`
             }
 
-            // Inject system prompt
             history.unshift({ role: "system", content: systemPrompt })
 
-            // 3. Setup a queue for the IPC stream listener
-            const queue: string[] = []
-            let resolveNext: (() => void) | null = null
-            let isDone = false
-
-            window.qvacAPI.onCompletionStream((token) => {
-                if (token === "") {
-                    isDone = true
-                } else {
-                    queue.push(token)
-                }
-                // Wake up the generator if it's waiting
-                if (resolveNext) {
-                    resolveNext()
-                    resolveNext = null
-                }
-            })
-
-            // 4. Trigger the main process inference
-            window.qvacAPI.infer(history, { kvCache: true })
-
-            // FIX: Accumulate the tokens. assistant-ui expects the full message state, not deltas.
-            let accumulatedText = ""
-
-            // 5. Yield the accumulated state as tokens arrive
-            while (!isDone || queue.length > 0) {
-                if (abortSignal?.aborted) break
-
-                if (queue.length > 0) {
-                    const token = queue.shift()
-                    if (token) {
-                        accumulatedText += token // Append the new token
-                        yield {
-                            content: [{ type: "text", text: accumulatedText }] // Yield the entire string
+            // 3. Define the transcript search tool (only injected when a video is active)
+            const tools = currentVideoWorkspaceId
+                ? [
+                    {
+                        type: "function",
+                        function: {
+                            name: "search_video_transcript",
+                            description:
+                                "Search the current video's transcript for specific keywords, events, or timestamps. " +
+                                "Use this whenever the user asks about something that happened in the video.",
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    query: {
+                                        type: "string",
+                                        description: "The keywords or phrase to search for in the transcript"
+                                    }
+                                },
+                                required: ["query"]
+                            }
                         }
                     }
-                } else {
-                    // Wait for the next token from the IPC listener
-                    await new Promise<void>((resolve) => {
-                        resolveNext = resolve
-                    })
+                ]
+                : []
+
+            // 4. Run the completion (streaming)
+            const run = await window.qvacAPI.completion({
+                history,
+                stream: true,
+                ...(tools.length > 0 ? { tools } : {})
+            })
+
+            let accumulatedText = ""
+
+            for await (const event of run.events) {
+                if (abortSignal?.aborted) break
+
+                if (event.type === "toolCall") {
+                    // ── Tool interception: RAG search ──────────────────
+                    try {
+                        if (!event.toolCall) throw new Error("toolCall payload missing")
+                        const args = JSON.parse(event.toolCall.function.arguments)
+                        const query: string = args.query || ""
+
+                        const ragResults = await window.qvacAPI.ragQuery(
+                            currentVideoWorkspaceId!,
+                            query
+                        )
+
+                        const ragContext =
+                            ragResults && ragResults.length > 0
+                                ? ragResults.map((r: any) => r.content).join("\n\n")
+                                : "No relevant transcript sections found."
+
+                        // Feed the RAG result back as a tool response and re-run
+                        const continueHistory = [
+                            ...history,
+                            {
+                                role: "tool",
+                                name: "search_video_transcript",
+                                content: ragContext
+                            }
+                        ]
+
+                        const followUp = await window.qvacAPI.completion({
+                            history: continueHistory,
+                            stream: true
+                        })
+
+                        for await (const followEvent of followUp.events) {
+                            if (abortSignal?.aborted) break
+                            if (followEvent.type === "contentDelta") {
+                                accumulatedText += followEvent.text
+                                yield { content: [{ type: "text", text: accumulatedText }] }
+                            }
+                        }
+                    } catch (err) {
+                        console.error("[QVAC] Tool call / RAG query failed:", err)
+                    }
+
+                } else if (event.type === "contentDelta") {
+                    accumulatedText += event.text
+                    yield { content: [{ type: "text", text: accumulatedText }] }
                 }
             }
         }
@@ -98,7 +129,7 @@ export function createQvacModelAdapter(
 }
 
 /**
- * @deprecated Use createQvacModelAdapter() instead for event context injection.
+ * @deprecated Use createQvacModelAdapter() instead.
  * Kept for backward compatibility.
  */
 export const qvacModelAdapter: ChatModelAdapter = {
