@@ -1,11 +1,8 @@
 /* eslint-disable */
 // @ts-nocheck
-Bare.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err)
-})
-Bare.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-})
+Bare.on('uncaughtException', (err) => { console.error('Uncaught Exception:', err) })
+Bare.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason) })
+
 
 const PearRuntime = require('pear-runtime')
 const Hyperswarm = require('hyperswarm')
@@ -80,9 +77,7 @@ const ownedChannels = new Set()
 // ── Blind Peering ──
 // For testing, we connect to a local blind-peer-cli if it exists.
 // We use a dummy key here or pass it in. If none, blind-peering just stays inactive.
-const relayKey =
-  (typeof Bare !== 'undefined' && Bare.env && Bare.env.BLIND_PEER_KEY) ||
-  '0000000000000000000000000000000000000000000000000000000000000000'
+const relayKey = (typeof Bare !== 'undefined' && Bare.env && Bare.env.BLIND_PEER_KEY) || '0000000000000000000000000000000000000000000000000000000000000000'
 const blindPeers = [b4a.from(relayKey, 'hex')]
 const blinds = new BlindPeering(swarm, blindPeers)
 
@@ -106,9 +101,7 @@ Bare.on('resume', async () => {
 setInterval(() => {
   if (rpc && rpc.channelEvent) {
     try {
-      rpc.channelEvent({
-        eventJson: JSON.stringify({ type: 'swarm-stats', count: swarm.connections.size })
-      })
+      rpc.channelEvent({ eventJson: JSON.stringify({ type: 'swarm-stats', count: swarm.connections.size }) })
     } catch (e) { }
   }
 }, 2000)
@@ -133,7 +126,7 @@ function getMimeType(filePath) {
     '.jpeg': 'image/jpeg',
     '.png': 'image/png',
     '.gif': 'image/gif',
-    '.webp': 'image/webp'
+    '.webp': 'image/webp',
   }
   return types[ext] || 'application/octet-stream'
 }
@@ -141,7 +134,7 @@ function getMimeType(filePath) {
 // ── RPC Handlers ──
 
 async function loadChannel(channelKey) {
-  if (channels.has(channelKey)) return
+  if (channels.has(channelKey)) return;
 
   const baseCore = store.get({ key: b4a.from(channelKey, 'hex') })
   await baseCore.ready()
@@ -188,23 +181,17 @@ rpc.onInitWorker(async (req) => {
     const savedChannels = await appStateCore.getUserData('owned-channels')
     if (savedChannels) {
       const parsed = JSON.parse(savedChannels.toString())
-      parsed.forEach((k) => {
-        ownedChannels.add(k)
-        channelsToLoad.add(k)
-      })
+      parsed.forEach(k => { ownedChannels.add(k); channelsToLoad.add(k); })
     }
   } catch (err) {
     console.error('Failed to load owned channels', err)
   }
 
   if (req.ownedChannels) {
-    req.ownedChannels.forEach((k) => {
-      ownedChannels.add(k)
-      channelsToLoad.add(k)
-    })
+    req.ownedChannels.forEach(k => { ownedChannels.add(k); channelsToLoad.add(k); })
   }
 
-  await Promise.all(Array.from(channelsToLoad).map((k) => loadChannel(k)))
+  await Promise.all(Array.from(channelsToLoad).map(k => loadChannel(k)))
 
   return { success: true }
 })
@@ -234,10 +221,7 @@ rpc.onInitChannel(async (req) => {
   ownedChannels.add(ownChannelKey)
   const appStateCore = store.get({ name: 'bolt-app-state' })
   await appStateCore.ready()
-  await appStateCore.setUserData(
-    'owned-channels',
-    Buffer.from(JSON.stringify(Array.from(ownedChannels)))
-  )
+  await appStateCore.setUserData('owned-channels', Buffer.from(JSON.stringify(Array.from(ownedChannels))))
 
   let avatarBlob = null
   let avatarExt = ''
@@ -262,13 +246,7 @@ rpc.onInitChannel(async (req) => {
     autobase,
     blobsCore,
     blobs,
-    metadata: {
-      name: req.name,
-      description: req.description,
-      avatarBlob,
-      avatarExt,
-      blobsKey: blobsKeyHex
-    },
+    metadata: { name: req.name, description: req.description, avatarBlob, avatarExt, blobsKey: blobsKeyHex },
     videos: [],
     events: []
   }
@@ -331,13 +309,8 @@ async function processAutobaseNode(channelKey, channelData, msg) {
       if (typeof blinds !== 'undefined') blinds.addCore(channelData.blobsCore)
     }
   } else if (msg.type === 'video') {
-    if (!channelData.videos.find((v) => v.id === msg.video.id)) {
+    if (!channelData.videos.find(v => v.id === msg.video.id)) {
       channelData.videos.unshift(msg.video)
-    }
-  } else if (msg.type === 'video-update') {
-    const index = channelData.videos.findIndex((v) => v.id === msg.video.id)
-    if (index >= 0) {
-      channelData.videos[index] = { ...channelData.videos[index], ...msg.video }
     }
   } else if (msg.type === 'event') {
     channelData.events.push(msg.event)
@@ -397,9 +370,7 @@ rpc.onGetFeed(async () => {
   }
 
   // Sort from newest to oldest
-  items.sort(
-    (a, b) => new Date(b.video.timestamp).getTime() - new Date(a.video.timestamp).getTime()
-  )
+  items.sort((a, b) => new Date(b.video.timestamp).getTime() - new Date(a.video.timestamp).getTime())
 
   return { itemsJson: JSON.stringify(items) }
 })
@@ -411,10 +382,7 @@ rpc.onGetChannels(async () => {
   for (const [channelKey, channel] of channels) {
     let avatar = channel.metadata.avatarPath || ''
     if (channel.blobsCore && channel.metadata.avatarBlob) {
-      avatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), {
-        blob: channel.metadata.avatarBlob,
-        type: getMimeType('dummy' + channel.metadata.avatarExt)
-      })
+      avatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
     }
 
     const info = {
@@ -441,19 +409,13 @@ rpc.onGetUploads(async (req) => {
   const channel = channels.get(activeChannelKey)
   let avatar = channel.metadata.avatarPath || ''
   if (channel.blobsCore && channel.metadata.avatarBlob) {
-    avatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), {
-      blob: channel.metadata.avatarBlob,
-      type: getMimeType('dummy' + channel.metadata.avatarExt)
-    })
+    avatar = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: channel.metadata.avatarBlob, type: getMimeType('dummy' + channel.metadata.avatarExt) })
   }
 
-  const videos = channel.videos.map((v) => {
+  const videos = channel.videos.map(v => {
     let thumbnailPath = v.thumbnailPath || ''
     if (channel.blobsCore && v.thumbnailBlob) {
-      thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), {
-        blob: v.thumbnailBlob,
-        type: getMimeType('dummy' + v.thumbnailExt)
-      })
+      thumbnailPath = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: v.thumbnailBlob, type: getMimeType('dummy' + v.thumbnailExt) })
     }
     const safeVideo = { ...v }
     delete safeVideo.blob
@@ -488,7 +450,7 @@ rpc.onUploadVideo(async (req) => {
   const totalBytes = fs.statSync(req.filePath).size
   let uploadedBytes = 0
 
-  rs.on('data', (chunk) => {
+  rs.on('data', chunk => {
     uploadedBytes += chunk.length
     rpc.uploadProgress({
       videoId,
@@ -505,15 +467,6 @@ rpc.onUploadVideo(async (req) => {
   })
 
   const blob = { key: channel.metadata.blobsKey, ...ws.id }
-
-  let matchData = null
-  if (req.matchData) {
-    try {
-      matchData = JSON.parse(req.matchData)
-    } catch (err) {
-      console.error('Failed to parse match metadata:', err)
-    }
-  }
 
   let thumbnailBlob = null
   let thumbnailExt = ''
@@ -534,57 +487,47 @@ rpc.onUploadVideo(async (req) => {
   }
 
   const workspaceId = `rag-${videoId}`
-  let transcriptText = ''
 
   try {
+    if (!transcribeModelId) {
+      transcribeModelId = await loadModel({ modelType: "parakeet", modelSrc: PARAKEET_TDT_0_6B_V3_Q8_0, })
+    }
     if (!embedModelId) {
       embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16 })
     }
 
-    if (req.transcriptPath) {
-      transcriptText = fs.readFileSync(req.transcriptPath, 'utf8')
-      console.log('Using provided transcript file for RAG ingestion.')
-    } else {
-      if (!transcribeModelId) {
-        transcribeModelId = await loadModel({
-          modelType: 'parakeet',
-          modelSrc: PARAKEET_TDT_0_6B_V3_Q8_0
-        })
-      }
+    console.log('Extracting audio with FFmpeg...')
+    const tempAudioPath = req.filePath + '.wav'
 
-      console.log('Extracting audio with FFmpeg...')
-      const tempAudioPath = req.filePath + '.wav'
+    const ff = spawnSync('ffmpeg', [
+      '-y',
+      '-i', req.filePath,
+      '-ar', '16000',
+      '-ac', '1',
+      '-c:a', 'pcm_s16le',
+      tempAudioPath
+    ], { stdio: 'ignore' })
 
-      const ff = spawnSync(
-        'ffmpeg',
-        ['-y', '-i', req.filePath, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', tempAudioPath],
-        { stdio: 'ignore' }
-      )
-
-      if (ff.status !== 0) {
-        throw new Error(`FFmpeg extraction failed with status code ${ff.status}`)
-      }
-
-      const audioBuffer = fs.readFileSync(tempAudioPath)
-
-      console.log(
-        'Audio extracted. Starting Parakeet transcription on CPU (this may take a while)...'
-      )
-      transcriptText = await transcribe({
-        modelId: transcribeModelId,
-        audioChunk: audioBuffer
-      })
-
-      console.log('Transcription successful:', transcriptText)
+    if (ff.status !== 0) {
+      throw new Error(`FFmpeg extraction failed with status code ${ff.status}`)
     }
 
-    if (transcriptText.trim()) {
-      await ragIngest({
-        workspaceId: workspaceId,
-        modelId: embedModelId,
-        documents: [transcriptText]
-      })
-    }
+    const audioBuffer = fs.readFileSync(tempAudioPath)
+
+    console.log('Audio extracted. Starting Parakeet transcription on CPU (this may take a while)...')
+    const transcriptText = await transcribe({
+      modelId: transcribeModelId,
+      audioChunk: audioBuffer
+    })
+
+    console.log('Transcription successful:', transcriptText)
+
+    await ragIngest({
+      workspaceId,
+      modelId: embedModelId,
+      documents: [transcriptText]
+    })
+
   } catch (err) {
     console.error('RAG ingest failed during upload:', err)
   }
@@ -600,9 +543,7 @@ rpc.onUploadVideo(async (req) => {
     thumbnailBlob,
     thumbnailExt,
     workspaceId,
-    isLive: false,
-    matchData,
-    aiSummary: null
+    isLive: false
   }
 
   await channel.autobase.append({
@@ -610,25 +551,7 @@ rpc.onUploadVideo(async (req) => {
     video: videoEntry
   })
 
-  rpc.uploadComplete({
-    channelKey: activeChannelKey,
-    videoJson: JSON.stringify(videoEntry)
-  })
-
   return { videoJson: JSON.stringify(videoEntry) }
-})
-
-rpc.onUpdateVideoMetadata(async (req) => {
-  const channel = channels.get(req.channelKey)
-  if (!channel) throw new Error('Channel not found')
-
-  const updatedVideo = JSON.parse(req.videoJson)
-  await channel.autobase.append({
-    type: 'video-update',
-    video: updatedVideo
-  })
-
-  return { success: true }
 })
 
 rpc.onStartStream(async (req) => {
@@ -636,15 +559,12 @@ rpc.onStartStream(async (req) => {
   const channel = channels.get(channelKey)
   if (!channel) throw new Error('Channel not found')
 
-  const video = channel.videos.find((v) => v.id === videoId)
+  const video = channel.videos.find(v => v.id === videoId)
   if (!video) throw new Error('Video not found')
 
   if (!channel.blobsCore) throw new Error('Blobs core not ready')
 
-  const link = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), {
-    blob: video.blob,
-    type: getMimeType(video.filename)
-  })
+  const link = blobServer.getLink(b4a.toString(channel.blobsCore.key, 'hex'), { blob: video.blob, type: getMimeType(video.filename) })
 
   return { url: link, channelKey, videoId }
 })
@@ -670,7 +590,7 @@ rpc.onDownloadVideo(async (req) => {
   const channel = channels.get(channelKey)
   if (!channel) throw new Error('Channel not found')
 
-  const video = channel.videos.find((v) => v.id === videoId)
+  const video = channel.videos.find(v => v.id === videoId)
   if (!video) throw new Error('Video not found')
 
   const totalBytes = video.sizeBytes || 0
@@ -716,12 +636,9 @@ goodbye(async () => {
 })
 
 // ── Signal Readiness ──
-initAI()
-  .then(() => startBlobServer())
-  .then(() => {
-    rpc.workerReady({})
-  })
-  .catch((err) => {
-    console.error('Failed to start worker server:', err)
-    rpc.workerReady({})
-  })
+initAI().then(() => startBlobServer()).then(() => {
+  rpc.workerReady({})
+}).catch(err => {
+  console.error('Failed to start worker server:', err)
+  rpc.workerReady({})
+})

@@ -10,14 +10,7 @@ declare global {
     qvacAPI: {
       // AI APIs
       loadModel: () => Promise<string>
-      infer: (
-        history: { role: string; content: string }[],
-        options?: {
-          kvCache?: boolean
-          inferenceMode?: 'local' | 'channel_peer' | 'cloud'
-          [key: string]: any
-        }
-      ) => Promise<void>
+      infer: (history: { role: string; content: string }[], options?: { kvCache?: boolean; [key: string]: any }) => Promise<void>
       unloadModel: () => Promise<string>
       onCompletionStream: (cb: (token: string) => void) => void
       onModelProgress: (cb: (progress: any) => void) => void
@@ -34,36 +27,19 @@ declare global {
       // Asset Selectors
       selectAvatar: () => Promise<{ canceled: boolean; filePath?: string }>
       selectThumbnail: () => Promise<{ canceled: boolean; filePath?: string }>
-      selectVideo: () => Promise<{ canceled: boolean; filePath?: string }>
-      selectTranscript: () => Promise<{ canceled: boolean; filePath?: string }>
 
       // Feed
       getFeed: () => Promise<void>
 
       // Upload / Studio
-      uploadVideo: (payload: {
-        filePath: string
-        title: string
-        duration: string
-        thumbnailPath?: string
-        matchData?: string
-        transcriptPath?: string
-        channelKey?: string
-      }) => Promise<{ canceled?: boolean }>
-      selectAndUploadVideo: (
-        title: string,
-        thumbnailPath?: string
-      ) => Promise<{ canceled: boolean; filePath?: string }>
+      selectAndUploadVideo: (title: string, thumbnailPath?: string) => Promise<{ canceled: boolean; filePath?: string }>
       getUploads: (channelKey?: string) => Promise<void>
 
       // Streaming
       getStreamUrl: (channelKey: string, videoId: string) => Promise<void>
 
       // Download & Seed
-      downloadVideo: (
-        channelKey: string,
-        videoId: string
-      ) => Promise<{ canceled: boolean; destinationPath?: string }>
+      downloadVideo: (channelKey: string, videoId: string) => Promise<{ canceled: boolean; destinationPath?: string }>
 
       // Live Events (AI Context)
       onChannelEvent: (cb: (event: ChannelEvent) => void) => void

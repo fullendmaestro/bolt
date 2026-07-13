@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 2,
   "schema": [
     {
       "id": 0,
@@ -201,32 +201,6 @@
         "stream": false
       },
       "version": 2
-    },
-    {
-      "id": 6,
-      "name": "@bolt/uploadComplete",
-      "request": {
-        "name": "@bolt/upload-complete",
-        "stream": false
-      },
-      "response": {
-        "name": "@bolt/empty-request",
-        "stream": false
-      },
-      "version": 3
-    },
-    {
-      "id": 12,
-      "name": "@bolt/updateVideoMetadata",
-      "request": {
-        "name": "@bolt/update-video-metadata-request",
-        "stream": false
-      },
-      "response": {
-        "name": "@bolt/update-video-metadata-response",
-        "stream": false
-      },
-      "version": 3
     }
   ]
 }

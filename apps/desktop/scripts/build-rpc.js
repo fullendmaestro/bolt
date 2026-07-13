@@ -25,12 +25,16 @@ schemaNs.register({
 })
 schemaNs.register({
   name: 'init-worker-request',
-  fields: [{ name: 'ownedChannels', type: 'string', array: true }]
+  fields: [
+    { name: 'ownedChannels', type: 'string', array: true }
+  ]
 })
 
 schemaNs.register({
   name: 'init-worker-response',
-  fields: [{ name: 'success', type: 'bool' }]
+  fields: [
+    { name: 'success', type: 'bool' }
+  ]
 })
 
 schemaNs.register({
@@ -61,22 +65,12 @@ schemaNs.register({
     { name: 'title', type: 'string' },
     { name: 'duration', type: 'string' },
     { name: 'thumbnailPath', type: 'string' },
-    { name: 'channelKey', type: 'string' },
-    { name: 'matchData', type: 'string' },
-    { name: 'transcriptPath', type: 'string' }
+    { name: 'channelKey', type: 'string' }
   ]
 })
 schemaNs.register({
   name: 'upload-video-response',
   fields: [{ name: 'videoJson', type: 'string' }]
-})
-
-schemaNs.register({
-  name: 'upload-complete',
-  fields: [
-    { name: 'channelKey', type: 'string' },
-    { name: 'videoJson', type: 'string' }
-  ]
 })
 
 schemaNs.register({
@@ -133,18 +127,6 @@ schemaNs.register({
 schemaNs.register({
   name: 'download-video-response',
   fields: [{ name: 'destinationPath', type: 'string' }]
-})
-
-schemaNs.register({
-  name: 'update-video-metadata-request',
-  fields: [
-    { name: 'channelKey', type: 'string' },
-    { name: 'videoJson', type: 'string' }
-  ]
-})
-schemaNs.register({
-  name: 'update-video-metadata-response',
-  fields: [{ name: 'success', type: 'bool' }]
 })
 
 schemaNs.register({
@@ -227,11 +209,6 @@ ns.register({
   response: { name: '@bolt/upload-video-response', stream: false }
 })
 ns.register({
-  name: 'uploadComplete',
-  request: { name: '@bolt/upload-complete', stream: false },
-  response: { name: '@bolt/empty-request', stream: false }
-})
-ns.register({
   name: 'getUploads',
   request: { name: '@bolt/get-uploads-request', stream: false },
   response: { name: '@bolt/get-uploads-response', stream: false }
@@ -255,11 +232,6 @@ ns.register({
   name: 'downloadVideo',
   request: { name: '@bolt/download-video-request', stream: false },
   response: { name: '@bolt/download-video-response', stream: false }
-})
-ns.register({
-  name: 'updateVideoMetadata',
-  request: { name: '@bolt/update-video-metadata-request', stream: false },
-  response: { name: '@bolt/update-video-metadata-response', stream: false }
 })
 ns.register({
   name: 'ragQuery',
