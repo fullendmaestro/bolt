@@ -59,12 +59,23 @@ declare global {
       // Asset Selectors
       selectAvatar: () => Promise<{ canceled: boolean; filePath?: string }>
       selectThumbnail: () => Promise<{ canceled: boolean; filePath?: string }>
+      selectTranscript: () => Promise<{ canceled: boolean; filePath?: string }>
+
 
       // Feed
       getFeed: () => Promise<void>
 
       // Upload / Studio
-      selectAndUploadVideo: (title: string, thumbnailPath?: string) => Promise<{ canceled: boolean; filePath?: string }>
+      selectAndUploadVideo: (meta: {
+        title?: string
+        thumbnailPath?: string
+        videoType?: string
+        opponentId?: string
+        score?: string
+        transcriptPath?: string
+        eventsJson?: string
+      }) => Promise<{ canceled: boolean; filePath?: string }>
+
       getUploads: (channelKey?: string) => Promise<void>
 
       // Streaming

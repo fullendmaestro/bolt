@@ -66,13 +66,21 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   // ── Asset Selectors (via Electron dialog) ─────────────────
   selectAvatar: () => ipcRenderer.invoke('channel:select-avatar'),
   selectThumbnail: () => ipcRenderer.invoke('video:select-thumbnail'),
+  selectTranscript: () => ipcRenderer.invoke('video:select-transcript'),
 
   // ── Feed ──────────────────────────────────────────────────
   getFeed: () => ipcRenderer.invoke('feed:get'),
 
   // ── Upload / Studio ───────────────────────────────────────
-  selectAndUploadVideo: (title: string, thumbnailPath?: string) =>
-    ipcRenderer.invoke('video:select-and-upload', title, thumbnailPath),
+  selectAndUploadVideo: (meta: {
+    title?: string
+    thumbnailPath?: string
+    videoType?: string
+    opponentId?: string
+    score?: string
+    transcriptPath?: string
+    eventsJson?: string
+  }) => ipcRenderer.invoke('video:select-and-upload', meta),
   getUploads: (channelKey?: string) => ipcRenderer.invoke('uploads:get', channelKey),
 
   // ── Streaming ─────────────────────────────────────────────

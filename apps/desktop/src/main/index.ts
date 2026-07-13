@@ -233,6 +233,17 @@ function setupHandlers(): void {
     return { canceled: false, filePath: result.filePaths[0] }
   })
 
+  ipcMain.handle('video:select-transcript', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Transcript File',
+      properties: ['openFile'],
+      filters: [{ name: 'Text / Subtitle', extensions: ['txt', 'srt', 'vtt'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+    return { canceled: false, filePath: result.filePaths[0] }
+  })
+
+
   // ── Feed Handler ──────────────────────────────────────
   ipcMain.handle('feed:get', async () => {
     const res = await rpc.getFeed({})
@@ -240,7 +251,15 @@ function setupHandlers(): void {
   })
 
   // ── Upload Handlers ───────────────────────────────────
-  ipcMain.handle('video:select-and-upload', async (_event, title: string, thumbnailPath?: string) => {
+  ipcMain.handle('video:select-and-upload', async (_event, meta: {
+    title?: string
+    thumbnailPath?: string
+    videoType?: string
+    opponentId?: string
+    score?: string
+    transcriptPath?: string
+    eventsJson?: string
+  }) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
@@ -254,10 +273,15 @@ function setupHandlers(): void {
 
     rpc.uploadVideo({
       filePath,
-      title: title || 'Untitled Upload',
+      title: meta?.title || 'Untitled Upload',
       duration: '0:00',
-      thumbnailPath: thumbnailPath || '',
-      channelKey: ''
+      thumbnailPath: meta?.thumbnailPath || '',
+      channelKey: '',
+      videoType: meta?.videoType || '',
+      opponentId: meta?.opponentId || '',
+      score: meta?.score || '',
+      transcriptPath: meta?.transcriptPath || '',
+      eventsJson: meta?.eventsJson || ''
     }).then((res) => {
       win?.webContents.send('p2p-worker-message', { type: 'upload-complete', video: JSON.parse(res.videoJson) })
     }).catch((err) => {
@@ -265,6 +289,7 @@ function setupHandlers(): void {
     })
     return { canceled: false, filePath }
   })
+
 
   ipcMain.handle('uploads:get', async (_event, channelKey?: string) => {
     const res = await rpc.getUploads({ channelKey: channelKey || '' })
