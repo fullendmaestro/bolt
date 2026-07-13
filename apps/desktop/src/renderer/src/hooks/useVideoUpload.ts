@@ -87,44 +87,52 @@ export function useVideoUpload({ onUploadComplete }: UseVideoUploadOptions = {})
     [onUploadComplete, resetUploadProgress]
   )
 
-  const handleVideoChange = useCallback((file: File | null) => {
-    if (!file) {
-      setVideoPath(null)
-      setVideoPreview(null)
-      setVideoName('')
-      return
-    }
+  const handleVideoChange = useCallback(async () => {
+    const result = await window.qvacAPI.selectVideo()
+    if (!result || result.canceled || !result.filePath) return
 
-    const filePath = (file as File & { path?: string }).path
-    setVideoPath(filePath || null)
-    setVideoPreview(filePath ? 'local-asset://' + encodeURIComponent(filePath) : null)
-    setVideoName(file.name)
+    const filePath = result.filePath
+    setVideoPath(filePath)
+    setVideoPreview('local-asset://' + encodeURIComponent(filePath))
+    
+    const parts = filePath.replace(/\\/g, '/').split('/')
+    setVideoName(parts[parts.length - 1])
   }, [])
 
-  const handleThumbnailChange = useCallback((file: File | null) => {
-    if (!file) {
+  const handleThumbnailChange = useCallback(async (clear?: null) => {
+    if (clear === null) {
       setThumbnailPath(null)
       setThumbnailPreview(null)
       setThumbnailName('')
       return
     }
 
-    const filePath = (file as File & { path?: string }).path
-    setThumbnailPath(filePath || null)
-    setThumbnailPreview(filePath ? 'local-asset://' + encodeURIComponent(filePath) : null)
-    setThumbnailName(file.name)
+    const result = await window.qvacAPI.selectThumbnail()
+    if (!result || result.canceled || !result.filePath) return
+
+    const filePath = result.filePath
+    setThumbnailPath(filePath)
+    setThumbnailPreview('local-asset://' + encodeURIComponent(filePath))
+    
+    const parts = filePath.replace(/\\/g, '/').split('/')
+    setThumbnailName(parts[parts.length - 1])
   }, [])
 
-  const handleTranscriptChange = useCallback((file: File | null) => {
-    if (!file) {
+  const handleTranscriptChange = useCallback(async (clear?: null) => {
+    if (clear === null) {
       setTranscriptPath(null)
       setTranscriptName('')
       return
     }
 
-    const filePath = (file as File & { path?: string }).path
-    setTranscriptPath(filePath || null)
-    setTranscriptName(file.name)
+    const result = await window.qvacAPI.selectTranscript()
+    if (!result || result.canceled || !result.filePath) return
+
+    const filePath = result.filePath
+    setTranscriptPath(filePath)
+    
+    const parts = filePath.replace(/\\/g, '/').split('/')
+    setTranscriptName(parts[parts.length - 1])
   }, [])
 
   const handleSubmitUpload = useCallback(async () => {

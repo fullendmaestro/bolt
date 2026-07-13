@@ -12,6 +12,27 @@ export function registerVideoHandlers({ getWindow, getRpc }: IpcHandlerContext):
     return { canceled: false, filePath: result.filePaths[0] }
   })
 
+  ipcMain.handle('video:select-video', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Video File',
+      properties: ['openFile'],
+      filters: [{ name: 'Video Files', extensions: ['mp4', 'mkv', 'webm', 'avi', 'mov'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+    return { canceled: false, filePath: result.filePaths[0] }
+  })
+
+  ipcMain.handle('video:select-transcript', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Transcript File',
+      properties: ['openFile'],
+      filters: [{ name: 'Transcripts', extensions: ['vtt', 'txt'] }, { name: 'All Files', extensions: ['*'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+    return { canceled: false, filePath: result.filePaths[0] }
+  })
+
+
   ipcMain.handle(
     'video:upload',
     async (

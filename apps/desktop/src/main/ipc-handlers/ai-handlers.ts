@@ -1,5 +1,4 @@
 import { ipcMain } from 'electron'
-import { QWEN3_4B_INST_Q4_K_M, completion, loadModel, unloadModel } from '@qvac/sdk'
 import type { IpcHandlerContext } from './types'
 
 type InferenceMode = 'local' | 'channel_peer' | 'cloud'
@@ -17,6 +16,8 @@ async function ensureModelLoaded(
           delegate: { providerPublicKey: context.localStore.get('ownChannelKey', '') || undefined }
         }
       : {}
+
+  const { loadModel, QWEN3_4B_INST_Q4_K_M } = await import('@qvac/sdk')
 
   const modelId = await loadModel({
     modelSrc: QWEN3_4B_INST_Q4_K_M,
@@ -68,21 +69,29 @@ async function runSummaryGeneration(
       : 'No transcript context available.'
   ].join('\n\n')
 
-  const run = completion({
-    modelId,
-    history: [
-      { role: 'system', content: 'You write concise sports match summaries.' },
-      { role: 'user', content: summaryPrompt }
-    ],
-    stream: true,
-    captureThinking: true
-  } as any)
-
   let summary = ''
-  for await (const ev of run.events) {
-    if (ev.type === 'contentDelta') summary += ev.text
+  try {
+    const { completion } = await import('@qvac/sdk')
+    const run = completion({
+      modelId,
+      history: [
+        { role: 'system', content: 'You write concise sports match summaries.' },
+        { role: 'user', content: summaryPrompt }
+      ],
+      stream: true,
+      captureThinking: true
+    } as any)
+
+    for await (const ev of run.events) {
+      if (ev.type === 'contentDelta') summary += ev.text
+    }
+    await run.final
+  } catch (err: any) {
+    if (err.code === 'WORKER_CRASHED' || err.code === 'RPC_CONNECTION_FAILED') {
+      context.setModelId(null)
+    }
+    throw err
   }
-  await run.final
 
   const updatedVideo = { ...video, aiSummary: summary.trim() }
   await context.getRpc().updateVideoMetadata({
@@ -118,6 +127,8 @@ export function registerAiHandlers({
   localStore
 }: IpcHandlerContext): void {
   ipcMain.handle('load-model', async () => {
+    const { loadModel, QWEN3_4B_INST_Q4_K_M } = await import('@qvac/sdk')
+
     const modelId = await loadModel({
       modelSrc: QWEN3_4B_INST_Q4_K_M,
       modelType: 'llm',
@@ -205,45 +216,53 @@ export function registerAiHandlers({
 
     let workingHistory = Array.isArray(history) ? [...history] : []
 
-    for (let cycle = 0; cycle < 3; cycle += 1) {
-      const result = completion({
-        modelId,
-        history: workingHistory,
-        tools,
-        stream: true,
-        captureThinking: true,
-        kvCache: options.kvCache ?? true
-      } as any)
+    try {
+      const { completion } = await import('@qvac/sdk')
+      for (let cycle = 0; cycle < 3; cycle += 1) {
+        const result = completion({
+          modelId,
+          history: workingHistory,
+          tools,
+          stream: true,
+          captureThinking: true,
+          kvCache: options.kvCache ?? true
+        } as any)
 
-      let assistantText = ''
-      const toolCalls: any[] = []
+        let assistantText = ''
+        const toolCalls: any[] = []
 
-      for await (const ev of result.events) {
-        if (ev.type === 'contentDelta') {
-          assistantText += ev.text
-          getWindow()?.webContents.send('completion-stream', ev.text)
-        } else if (ev.type === 'toolCall') {
-          toolCalls.push(ev.call)
+        for await (const ev of result.events) {
+          if (ev.type === 'contentDelta') {
+            assistantText += ev.text
+            getWindow()?.webContents.send('completion-stream', ev.text)
+          } else if (ev.type === 'toolCall') {
+            toolCalls.push(ev.call)
+          }
         }
+
+        await result.final
+
+        if (toolCalls.length === 0) {
+          getWindow()?.webContents.send('completion-stream', '')
+          return
+        }
+
+        workingHistory = workingHistory.concat(
+          assistantText ? [{ role: 'assistant', content: assistantText }] : [],
+          ...(await Promise.all(
+            toolCalls.map(async (call) => ({
+              role: 'tool',
+              name: call.name,
+              content: JSON.stringify(await resolveTool(call))
+            }))
+          ))
+        )
       }
-
-      await result.final
-
-      if (toolCalls.length === 0) {
-        getWindow()?.webContents.send('completion-stream', '')
-        return
+    } catch (err: any) {
+      if (err.code === 'WORKER_CRASHED' || err.code === 'RPC_CONNECTION_FAILED') {
+        setModelId(null)
       }
-
-      workingHistory = workingHistory.concat(
-        assistantText ? [{ role: 'assistant', content: assistantText }] : [],
-        ...(await Promise.all(
-          toolCalls.map(async (call) => ({
-            role: 'tool',
-            name: call.name,
-            content: JSON.stringify(await resolveTool(call))
-          }))
-        ))
-      )
+      throw err
     }
 
     getWindow()?.webContents.send('completion-stream', '')
@@ -253,6 +272,7 @@ export function registerAiHandlers({
     const modelId = getModelId()
     if (!modelId) throw new Error('Model not loaded.')
 
+    const { unloadModel } = await import('@qvac/sdk')
     await unloadModel({ modelId })
     setModelId(null)
     return 'model unloaded'

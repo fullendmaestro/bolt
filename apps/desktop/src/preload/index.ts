@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   // ── Asset Selectors (via Electron dialog) ─────────────────
   selectAvatar: () => ipcRenderer.invoke('channel:select-avatar'),
   selectThumbnail: () => ipcRenderer.invoke('video:select-thumbnail'),
+  selectVideo: () => ipcRenderer.invoke('video:select-video'),
+  selectTranscript: () => ipcRenderer.invoke('video:select-transcript'),
 
   // ── Feed ──────────────────────────────────────────────────
   getFeed: () => ipcRenderer.invoke('feed:get'),

@@ -34,6 +34,8 @@ declare global {
       // Asset Selectors
       selectAvatar: () => Promise<{ canceled: boolean; filePath?: string }>
       selectThumbnail: () => Promise<{ canceled: boolean; filePath?: string }>
+      selectVideo: () => Promise<{ canceled: boolean; filePath?: string }>
+      selectTranscript: () => Promise<{ canceled: boolean; filePath?: string }>
 
       // Feed
       getFeed: () => Promise<void>
