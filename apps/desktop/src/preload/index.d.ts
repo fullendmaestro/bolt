@@ -1,5 +1,24 @@
 import type { ChannelEvent } from '../shared/types'
 
+/** A single streaming event from qvacAPI.completion() */
+export interface CompletionEvent {
+  type: 'contentDelta' | 'toolCall'
+  /** Present when type === 'contentDelta' */
+  text?: string
+  /** Present when type === 'toolCall' */
+  toolCall?: {
+    function: {
+      name: string
+      arguments: string
+    }
+  }
+}
+
+/** Return value of qvacAPI.completion() */
+export interface CompletionRun {
+  events: AsyncIterable<CompletionEvent>
+}
+
 declare global {
   interface Window {
     electron: {
@@ -9,13 +28,26 @@ declare global {
     }
     qvacAPI: {
       // AI APIs
-      loadModel: () => Promise<string>
+      loadModel: (options?: {
+        modelSrc?: string
+        modelType?: string
+        delegate?: {
+          providerPublicKey: string
+          timeout?: number
+          fallbackToLocal?: boolean
+        }
+      }) => Promise<string>
       infer: (history: { role: string; content: string }[], options?: { kvCache?: boolean; [key: string]: any }) => Promise<void>
       unloadModel: () => Promise<string>
       onCompletionStream: (cb: (token: string) => void) => void
       onModelProgress: (cb: (progress: any) => void) => void
       removeModelProgressListener: () => void
       ragQuery: (workspaceId: string, query: string) => Promise<any[]>
+      completion: (options: {
+        history: { role: string; content: string; name?: string }[]
+        stream: boolean
+        tools?: object[]
+      }) => Promise<CompletionRun>
 
       // Channel Management
       joinChannel: (channelKey: string) => Promise<void>
