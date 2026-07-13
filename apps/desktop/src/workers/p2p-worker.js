@@ -23,8 +23,11 @@ const BlindPeering = require('blind-peering')
 const {
   loadModel,
   transcribe,
-  ragIngest,
+  ragChunk,
+  embed,
+  ragSaveEmbeddings,
   ragSearch,
+  startQVACProvider,
   plugins,
   registerPlugin,
   PARAKEET_TDT_0_6B_V3_Q8_0,
@@ -252,6 +255,16 @@ rpc.onInitChannel(async (req) => {
   }
   channels.set(ownChannelKey, channelData)
 
+  // Start QVAC provider if this channel owner opts in as a delegate
+  if (req.isDelegate) {
+    try {
+      await startQVACProvider()
+      console.log('[Bolt Worker] QVAC provider started — this node accepts delegated inference.')
+    } catch (err) {
+      console.error('[Bolt Worker] Failed to start QVAC provider:', err)
+    }
+  }
+
   // Append init msg
   await autobase.append({
     type: 'init',
@@ -259,7 +272,9 @@ rpc.onInitChannel(async (req) => {
     description: req.description,
     avatarBlob,
     avatarExt,
-    blobsKey: blobsKeyHex
+    blobsKey: blobsKeyHex,
+    isDelegate: !!req.isDelegate,
+    delegateDescription: req.delegateDescription || ''
   })
 
   swarm.join(baseCore.discoveryKey, { server: true, client: true })
@@ -489,47 +504,53 @@ rpc.onUploadVideo(async (req) => {
   const workspaceId = `rag-${videoId}`
 
   try {
-    if (!transcribeModelId) {
-      transcribeModelId = await loadModel({ modelType: "parakeet", modelSrc: PARAKEET_TDT_0_6B_V3_Q8_0, })
-    }
     if (!embedModelId) {
-      embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16 })
+      embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16, modelType: 'embeddings' })
     }
 
-    console.log('Extracting audio with FFmpeg...')
-    const tempAudioPath = req.filePath + '.wav'
+    let transcriptText = ''
 
-    const ff = spawnSync('ffmpeg', [
-      '-y',
-      '-i', req.filePath,
-      '-ar', '16000',
-      '-ac', '1',
-      '-c:a', 'pcm_s16le',
-      tempAudioPath
-    ], { stdio: 'ignore' })
+    if (req.transcriptPath) {
+      // User supplied a pre-existing transcript — skip Parakeet entirely
+      console.log('[Bolt Worker] Using provided transcript:', req.transcriptPath)
+      transcriptText = fs.readFileSync(req.transcriptPath, 'utf8')
+    } else {
+      // Generate transcript with Parakeet
+      if (!transcribeModelId) {
+        transcribeModelId = await loadModel({ modelSrc: PARAKEET_TDT_0_6B_V3_Q8_0, modelType: 'parakeet' })
+      }
 
-    if (ff.status !== 0) {
-      throw new Error(`FFmpeg extraction failed with status code ${ff.status}`)
+      console.log('[Bolt Worker] Extracting audio with FFmpeg...')
+      const tempAudioPath = req.filePath + '.wav'
+
+      const ff = spawnSync('ffmpeg', [
+        '-y',
+        '-i', req.filePath,
+        '-ar', '16000',
+        '-ac', '1',
+        '-c:a', 'pcm_s16le',
+        tempAudioPath
+      ], { stdio: 'ignore' })
+
+      if (ff.status !== 0) {
+        throw new Error(`FFmpeg extraction failed with status code ${ff.status}`)
+      }
+
+      const audioBuffer = fs.readFileSync(tempAudioPath)
+      console.log('[Bolt Worker] Audio extracted. Starting Parakeet transcription...')
+      const transcriptResponse = await transcribe({ modelId: transcribeModelId, audioChunk: audioBuffer })
+      transcriptText = transcriptResponse.text
+      console.log('[Bolt Worker] Transcription complete.')
     }
 
-    const audioBuffer = fs.readFileSync(tempAudioPath)
-
-    console.log('Audio extracted. Starting Parakeet transcription on CPU (this may take a while)...')
-    const transcriptText = await transcribe({
-      modelId: transcribeModelId,
-      audioChunk: audioBuffer
-    })
-
-    console.log('Transcription successful:', transcriptText)
-
-    await ragIngest({
-      workspaceId,
-      modelId: embedModelId,
-      documents: [transcriptText]
-    })
+    // Segregated RAG pipeline: chunk → embed → save
+    const chunks = await ragChunk({ text: transcriptText })
+    const embeddings = await embed({ modelId: embedModelId, text: chunks })
+    await ragSaveEmbeddings({ workspaceId, embeddings })
+    console.log('[Bolt Worker] RAG embeddings saved for workspace:', workspaceId)
 
   } catch (err) {
-    console.error('RAG ingest failed during upload:', err)
+    console.error('[Bolt Worker] RAG pipeline failed during upload:', err)
   }
 
   const videoEntry = {
@@ -543,7 +564,13 @@ rpc.onUploadVideo(async (req) => {
     thumbnailBlob,
     thumbnailExt,
     workspaceId,
-    isLive: false
+    isLive: false,
+    // User-supplied match metadata
+    videoType: req.videoType || '',
+    opponentId: req.opponentId || '',
+    score: req.score || '',
+    transcriptPath: req.transcriptPath || '',
+    eventsJson: req.eventsJson || ''
   }
 
   await channel.autobase.append({
