@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "schema": [
     {
       "name": "join-channel-request",
@@ -94,6 +94,16 @@
           "name": "avatarPath",
           "type": "string",
           "version": 1
+        },
+        {
+          "name": "isDelegate",
+          "type": "bool",
+          "version": 3
+        },
+        {
+          "name": "delegateDescription",
+          "type": "string",
+          "version": 3
         }
       ]
     },
@@ -145,6 +155,31 @@
           "name": "channelKey",
           "type": "string",
           "version": 1
+        },
+        {
+          "name": "videoType",
+          "type": "string",
+          "version": 3
+        },
+        {
+          "name": "opponentId",
+          "type": "string",
+          "version": 3
+        },
+        {
+          "name": "score",
+          "type": "string",
+          "version": 3
+        },
+        {
+          "name": "transcriptPath",
+          "type": "string",
+          "version": 3
+        },
+        {
+          "name": "eventsJson",
+          "type": "string",
+          "version": 3
         }
       ]
     },

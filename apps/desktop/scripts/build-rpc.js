@@ -47,7 +47,9 @@ schemaNs.register({
   fields: [
     { name: 'name', type: 'string' },
     { name: 'description', type: 'string' },
-    { name: 'avatarPath', type: 'string' }
+    { name: 'avatarPath', type: 'string' },
+    { name: 'isDelegate', type: 'bool' },
+    { name: 'delegateDescription', type: 'string' }
   ]
 })
 schemaNs.register({
@@ -65,7 +67,12 @@ schemaNs.register({
     { name: 'title', type: 'string' },
     { name: 'duration', type: 'string' },
     { name: 'thumbnailPath', type: 'string' },
-    { name: 'channelKey', type: 'string' }
+    { name: 'channelKey', type: 'string' },
+    { name: 'videoType', type: 'string' },
+    { name: 'opponentId', type: 'string' },
+    { name: 'score', type: 'string' },
+    { name: 'transcriptPath', type: 'string' },
+    { name: 'eventsJson', type: 'string' }
   ]
 })
 schemaNs.register({
