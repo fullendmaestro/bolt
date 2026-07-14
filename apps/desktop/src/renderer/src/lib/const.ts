@@ -1,0 +1,50 @@
+const footballTeams = [
+    {
+        id: "paris-saint-germain",
+        name: "Paris Saint-Germain",
+        shortName: "PSG",
+        league: "Ligue 1",
+        country: "France",
+        crestUrl: "/crests/france_paris-saint-germain.football-logos.cc.svg",
+    },
+    {
+        id: "liverpool",
+        name: "Liverpool FC",
+        shortName: "LIV",
+        league: "Premier League",
+        country: "England",
+        crestUrl: "/crests/england_liverpool.football-logos.cc.svg",
+    },
+    {
+        id: "borussia-dortmund",
+        name: "Borussia Dortmund",
+        shortName: "BVB",
+        league: "Bundesliga",
+        country: "Germany",
+        crestUrl: "/crests/germany_borussia-dortmund.football-logos.cc.svg",
+    },
+    {
+        id: "ac-milan",
+        name: "AC Milan",
+        shortName: "MIL",
+        league: "Serie A",
+        country: "Italy",
+        crestUrl: "/crests/italy_milan.football-logos.cc.svg",
+    },
+    {
+        id: "manchester-city",
+        name: "Manchester City",
+        shortName: "MCI",
+        league: "Premier League",
+        country: "England",
+        crestUrl: "/crests/england_manchester-city.football-logos.cc.svg",
+    },
+    {
+        id: "real-madrid",
+        name: "Real Madrid",
+        shortName: "RMA",
+        league: "La Liga",
+        country: "Spain",
+        crestUrl: "/crests/spain_real-madrid.football-logos.cc.svg",
+    }
+];
