@@ -4,12 +4,6 @@ import { pathToFileURL } from 'url'
 import { z } from 'zod'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import {
-  LLAMA_3_2_1B_INST_Q4_0,
-  loadModel,
-  unloadModel,
-  completion
-} from '@qvac/sdk'
 import Store from 'electron-store'
 import type { ChannelEvent } from '../shared/types'
 const PearRuntime = require('pear-runtime')
@@ -116,6 +110,18 @@ function initP2PWorker(): void {
     win?.webContents.send('p2p-worker-message', { type: 'download-progress', videoId, channelKey, percent, bytesReceived, totalBytes })
   })
 
+  rpc.onModelProgress(({ progressJson }: any) => {
+    win?.webContents.send('model-progress', JSON.parse(progressJson))
+  })
+
+  rpc.onCompletionStream(({ token }: any) => {
+    win?.webContents.send('completion-stream', token)
+  })
+
+  rpc.onCompletionToolCall(({ call }: any) => {
+    win?.webContents.send('completion-tool-call', JSON.parse(call))
+  })
+
   worker.on('error', (err: Error) => {
     console.error('Worker pipe error:', err)
   })
@@ -133,14 +139,8 @@ function initP2PWorker(): void {
 function setupHandlers(): void {
   // ── QVAC AI Handlers ──────────────────────────────────
   ipcMain.handle('load-model', async () => {
-    modelId = await loadModel({
-      modelSrc: LLAMA_3_2_1B_INST_Q4_0,
-      modelType: 'llm',
-      onProgress: (progress) => {
-        console.log(progress)
-        win?.webContents.send('model-progress', progress)
-      }
-    })
+    const res = await rpc.loadModel({ modelType: 'llm' })
+    modelId = res.modelId
     return 'model loaded'
   })
 
@@ -158,26 +158,12 @@ function setupHandlers(): void {
       })
     }
 
-    const result = await completion({ modelId, stream: true, ...options })
-    for await (const event of result.events || []) {
-      if (event.type === 'contentDelta') {
-        win?.webContents.send('completion-stream', event.text)
-      } else if (event.type === 'toolCall') {
-        win?.webContents.send('completion-tool-call', event.call)
-      }
-    }
-    // Backward compatibility for tokenStream in case qvacAPI hasn't updated its output structure
-    if (result.tokenStream) {
-      for await (const token of result.tokenStream) {
-        win?.webContents.send('completion-stream', token)
-      }
-    }
-    win?.webContents.send('completion-stream', '')
+    await rpc.infer({ modelId, optionsJson: JSON.stringify(options) })
   })
 
   ipcMain.handle('unload-model', async () => {
     if (!modelId) throw new Error('Model not loaded.')
-    await unloadModel({ modelId })
+    await rpc.unloadModel({ modelId })
     modelId = null
     return 'model unloaded'
   })

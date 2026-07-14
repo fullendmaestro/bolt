@@ -39,7 +39,19 @@ const methods = new Map([
   ['@bolt/errorEvent', 15],
   [15, '@bolt/errorEvent'],
   ['@bolt/ragQuery', 16],
-  [16, '@bolt/ragQuery']
+  [16, '@bolt/ragQuery'],
+  ['@bolt/loadModel', 17],
+  [17, '@bolt/loadModel'],
+  ['@bolt/unloadModel', 18],
+  [18, '@bolt/unloadModel'],
+  ['@bolt/infer', 19],
+  [19, '@bolt/infer'],
+  ['@bolt/completionStream', 20],
+  [20, '@bolt/completionStream'],
+  ['@bolt/completionToolCall', 21],
+  [21, '@bolt/completionToolCall'],
+  ['@bolt/modelProgress', 22],
+  [22, '@bolt/modelProgress']
 ])
 
 class HRPC {
@@ -63,7 +75,13 @@ class HRPC {
       ['@bolt/uploadProgress', getEncoding('@bolt/upload-progress')],
       ['@bolt/downloadProgress', getEncoding('@bolt/download-progress')],
       ['@bolt/errorEvent', getEncoding('@bolt/error-event')],
-      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-request')]
+      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-request')],
+      ['@bolt/loadModel', getEncoding('@bolt/load-model-request')],
+      ['@bolt/unloadModel', getEncoding('@bolt/unload-model-request')],
+      ['@bolt/infer', getEncoding('@bolt/infer-request')],
+      ['@bolt/completionStream', getEncoding('@bolt/completion-stream')],
+      ['@bolt/completionToolCall', getEncoding('@bolt/completion-tool-call')],
+      ['@bolt/modelProgress', getEncoding('@bolt/model-progress')]
     ])
     this._responseEncodings = new Map([
       ['@bolt/joinChannel', getEncoding('@bolt/channel-response')],
@@ -77,7 +95,10 @@ class HRPC {
       ['@bolt/startStream', getEncoding('@bolt/start-stream-response')],
       ['@bolt/injectEvent', getEncoding('@bolt/success-response')],
       ['@bolt/downloadVideo', getEncoding('@bolt/download-video-response')],
-      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-response')]
+      ['@bolt/ragQuery', getEncoding('@bolt/rag-query-response')],
+      ['@bolt/loadModel', getEncoding('@bolt/load-model-response')],
+      ['@bolt/unloadModel', getEncoding('@bolt/unload-model-response')],
+      ['@bolt/infer', getEncoding('@bolt/infer-response')]
     ])
     this._rpc = new RPC(stream, async (req) => {
       const command = methods.get(req.command)
@@ -243,6 +264,30 @@ class HRPC {
     return this._call('@bolt/ragQuery', args)
   }
 
+  async loadModel(args) {
+    return this._call('@bolt/loadModel', args)
+  }
+
+  async unloadModel(args) {
+    return this._call('@bolt/unloadModel', args)
+  }
+
+  async infer(args) {
+    return this._call('@bolt/infer', args)
+  }
+
+  completionStream(args) {
+    return this._callSync('@bolt/completionStream', args)
+  }
+
+  completionToolCall(args) {
+    return this._callSync('@bolt/completionToolCall', args)
+  }
+
+  modelProgress(args) {
+    return this._callSync('@bolt/modelProgress', args)
+  }
+
   onJoinChannel(responseFn) {
     this._handlers['@bolt/joinChannel'] = responseFn
   }
@@ -311,6 +356,30 @@ class HRPC {
     this._handlers['@bolt/ragQuery'] = responseFn
   }
 
+  onLoadModel(responseFn) {
+    this._handlers['@bolt/loadModel'] = responseFn
+  }
+
+  onUnloadModel(responseFn) {
+    this._handlers['@bolt/unloadModel'] = responseFn
+  }
+
+  onInfer(responseFn) {
+    this._handlers['@bolt/infer'] = responseFn
+  }
+
+  onCompletionStream(responseFn) {
+    this._handlers['@bolt/completionStream'] = responseFn
+  }
+
+  onCompletionToolCall(responseFn) {
+    this._handlers['@bolt/completionToolCall'] = responseFn
+  }
+
+  onModelProgress(responseFn) {
+    this._handlers['@bolt/modelProgress'] = responseFn
+  }
+
   _requestIsStream(command) {
     return [
     ].includes(command)
@@ -329,7 +398,10 @@ class HRPC {
       '@bolt/channelEvent',
       '@bolt/uploadProgress',
       '@bolt/downloadProgress',
-      '@bolt/errorEvent'
+      '@bolt/errorEvent',
+      '@bolt/completionStream',
+      '@bolt/completionToolCall',
+      '@bolt/modelProgress'
     ].includes(command)
   }
 }

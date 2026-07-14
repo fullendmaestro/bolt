@@ -1,5 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
+global.process = require('bare-process');
+
 Bare.on('uncaughtException', (err) => { console.error('Uncaught Exception:', err) })
 Bare.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason) })
 
@@ -20,31 +22,30 @@ const BlobServer = require('hypercore-blob-server')
 const Autobase = require('autobase')
 const BlindPeering = require('blind-peering')
 
+import parakeetPlugin from '@qvac/bare-sdk/parakeet-transcription/plugin';
+import embeddingsPlugin from '@qvac/bare-sdk/llamacpp-embedding/plugin';
+
 const {
   loadModel,
+  unloadModel,
+  completion,
+  suspend,
   transcribe,
   ragIngest,
   ragSearch,
   startQVACProvider,
+  stopQVACProvider,
   plugins,
   registerPlugin,
   PARAKEET_TDT_0_6B_V3_Q8_0,
-  GTE_LARGE_FP16
+  GTE_LARGE_FP16,
+  LLAMA_3_2_1B_INST_Q4_0
 } = require('@qvac/bare-sdk')
 
 async function initAI() {
   try {
-    const parakeetModule = await import('@qvac/bare-sdk/parakeet-transcription/plugin');
-    const embeddingsModule = await import('@qvac/bare-sdk/llamacpp-embedding/plugin');
-
-    const parakeet = parakeetModule.parakeetPlugin || parakeetModule.default || parakeetModule;
-    const embeddings = embeddingsModule.embeddingsPlugin || embeddingsModule.default || embeddingsModule;
-
-    plugins([
-      parakeet,
-      embeddings
-    ]);
-
+    registerPlugin(parakeetPlugin);
+    registerPlugin(embeddingsPlugin);
     console.log("P2P Worker plugins registered successfully!");
   } catch (err) {
     console.error("Failed to initialize AI plugins:", err);
@@ -89,6 +90,8 @@ swarm.on('connection', (connection) => {
 
 // ── App Lifecycle ──
 Bare.on('suspend', async () => {
+  await suspend()
+  await store.flush()
   await swarm.suspend()
   pipe.unref()
 })
@@ -642,20 +645,68 @@ rpc.onDownloadVideo(async (req) => {
 })
 
 rpc.onRagQuery(async (req) => {
-  const { workspaceId, query } = req
   if (!embedModelId) {
     embedModelId = await loadModel({ modelSrc: GTE_LARGE_FP16 })
   }
   const res = await ragSearch({
-    workspace: workspaceId,
-    modelId: embedModelId,
-    query
+    workspaceId: req.workspaceId,
+    query: req.query
   })
   return { resultsJson: JSON.stringify(res.results || []) }
 })
 
+rpc.onLoadModel(async (req) => {
+  try {
+    const modelId = await loadModel({
+      modelSrc: req.modelSrc || LLAMA_3_2_1B_INST_Q4_0,
+      modelType: req.modelType || 'llm',
+      onProgress: (progress) => {
+        rpc.modelProgress({ progressJson: JSON.stringify(progress) })
+      }
+    })
+    return { modelId }
+  } catch (err) {
+    console.error('loadModel error:', err)
+    throw err
+  }
+})
+
+rpc.onUnloadModel(async (req) => {
+  try {
+    await unloadModel({ modelId: req.modelId })
+    return { success: true }
+  } catch (err) {
+    console.error('unloadModel error:', err)
+    throw err
+  }
+})
+
+rpc.onInfer(async (req) => {
+  try {
+    const options = JSON.parse(req.optionsJson)
+    const run = completion({ modelId: req.modelId, ...options })
+    for await (const ev of run.events) {
+      if (ev.type === 'contentDelta') {
+        rpc.completionStream({ token: ev.text })
+      } else if (ev.type === 'toolCall') {
+        rpc.completionToolCall({ call: JSON.stringify(ev.call) })
+      }
+    }
+    rpc.completionStream({ token: '' }) // end of stream
+    return { success: true }
+  } catch (err) {
+    console.error('infer error:', err)
+    throw err
+  }
+})
+
 // ── Graceful Shutdown ──
 goodbye(async () => {
+  try {
+    await stopQVACProvider()
+  } catch (e) {
+    console.error('Error stopping QVAC provider', e)
+  }
   if (blobServer) await blobServer.close()
   await swarm.destroy()
   await pear.close()

@@ -148,6 +148,41 @@ schemaNs.register({
   fields: [{ name: 'resultsJson', type: 'string' }]
 })
 
+// ── AI Methods ──
+schemaNs.register({
+  name: 'load-model-request',
+  fields: [
+    { name: 'modelSrc', type: 'string' },
+    { name: 'modelType', type: 'string' }
+  ]
+})
+schemaNs.register({
+  name: 'load-model-response',
+  fields: [{ name: 'modelId', type: 'string' }]
+})
+
+schemaNs.register({
+  name: 'unload-model-request',
+  fields: [{ name: 'modelId', type: 'string' }]
+})
+schemaNs.register({
+  name: 'unload-model-response',
+  fields: [{ name: 'success', type: 'bool' }]
+})
+
+schemaNs.register({
+  name: 'infer-request',
+  fields: [
+    { name: 'modelId', type: 'string' },
+    { name: 'optionsJson', type: 'string' } // we can pass the whole options object as json
+  ]
+})
+schemaNs.register({
+  name: 'infer-response',
+  fields: [{ name: 'success', type: 'bool' }]
+})
+
+
 // ── Server Events (Worker -> Main) ──
 schemaNs.register({
   name: 'channel-event',
@@ -176,6 +211,21 @@ schemaNs.register({
     { name: 'message', type: 'string' },
     { name: 'command', type: 'string' }
   ]
+})
+
+schemaNs.register({
+  name: 'completion-stream',
+  fields: [{ name: 'token', type: 'string' }]
+})
+
+schemaNs.register({
+  name: 'completion-tool-call',
+  fields: [{ name: 'call', type: 'string' }]
+})
+
+schemaNs.register({
+  name: 'model-progress',
+  fields: [{ name: 'progressJson', type: 'string' }]
 })
 
 Hyperschema.toDisk(schema)
@@ -245,6 +295,21 @@ ns.register({
   request: { name: '@bolt/rag-query-request', stream: false },
   response: { name: '@bolt/rag-query-response', stream: false }
 })
+ns.register({
+  name: 'loadModel',
+  request: { name: '@bolt/load-model-request', stream: false },
+  response: { name: '@bolt/load-model-response', stream: false }
+})
+ns.register({
+  name: 'unloadModel',
+  request: { name: '@bolt/unload-model-request', stream: false },
+  response: { name: '@bolt/unload-model-response', stream: false }
+})
+ns.register({
+  name: 'infer',
+  request: { name: '@bolt/infer-request', stream: false },
+  response: { name: '@bolt/infer-response', stream: false }
+})
 
 // Send-only commands (Worker -> Main)
 ns.register({
@@ -266,6 +331,18 @@ ns.register({
 ns.register({
   name: 'errorEvent',
   request: { name: '@bolt/error-event', send: true }
+})
+ns.register({
+  name: 'completionStream',
+  request: { name: '@bolt/completion-stream', send: true }
+})
+ns.register({
+  name: 'completionToolCall',
+  request: { name: '@bolt/completion-tool-call', send: true }
+})
+ns.register({
+  name: 'modelProgress',
+  request: { name: '@bolt/model-progress', send: true }
 })
 
 // Save interface to disk

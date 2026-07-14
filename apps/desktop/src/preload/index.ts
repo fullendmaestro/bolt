@@ -5,10 +5,16 @@ contextBridge.exposeInMainWorld('qvacAPI', {
   loadModel: (options?: object) => ipcRenderer.invoke('load-model', options),
   infer: (history, options) => ipcRenderer.invoke('infer', history, options),
   unloadModel: () => ipcRenderer.invoke('unload-model'),
-  onCompletionStream: (cb) =>
-    ipcRenderer.on('completion-stream', (_event, token) => cb(token)),
-  onModelProgress: (cb) =>
-    ipcRenderer.on('model-progress', (_event, progress) => cb(progress)),
+  onCompletionStream: (cb) => {
+    const listener = (_event, token) => cb(token)
+    ipcRenderer.on('completion-stream', listener)
+    return () => ipcRenderer.removeListener('completion-stream', listener)
+  },
+  onModelProgress: (cb) => {
+    const listener = (_event, progress) => cb(progress)
+    ipcRenderer.on('model-progress', listener)
+    return () => ipcRenderer.removeListener('model-progress', listener)
+  },
   removeModelProgressListener: () =>
     ipcRenderer.removeAllListeners('model-progress'),
   ragQuery: (workspaceId: string, query: string) => ipcRenderer.invoke('rag:query', workspaceId, query),

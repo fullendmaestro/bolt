@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "schema": [
     {
       "id": 0,
@@ -201,6 +201,72 @@
         "stream": false
       },
       "version": 2
+    },
+    {
+      "id": 12,
+      "name": "@bolt/loadModel",
+      "request": {
+        "name": "@bolt/load-model-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/load-model-response",
+        "stream": false
+      },
+      "version": 3
+    },
+    {
+      "id": 13,
+      "name": "@bolt/unloadModel",
+      "request": {
+        "name": "@bolt/unload-model-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/unload-model-response",
+        "stream": false
+      },
+      "version": 3
+    },
+    {
+      "id": 14,
+      "name": "@bolt/infer",
+      "request": {
+        "name": "@bolt/infer-request",
+        "stream": false
+      },
+      "response": {
+        "name": "@bolt/infer-response",
+        "stream": false
+      },
+      "version": 3
+    },
+    {
+      "id": 20,
+      "name": "@bolt/completionStream",
+      "request": {
+        "name": "@bolt/completion-stream",
+        "send": true
+      },
+      "version": 3
+    },
+    {
+      "id": 21,
+      "name": "@bolt/completionToolCall",
+      "request": {
+        "name": "@bolt/completion-tool-call",
+        "send": true
+      },
+      "version": 3
+    },
+    {
+      "id": 22,
+      "name": "@bolt/modelProgress",
+      "request": {
+        "name": "@bolt/model-progress",
+        "send": true
+      },
+      "version": 3
     }
   ]
 }

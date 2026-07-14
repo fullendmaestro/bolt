@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "schema": [
     {
       "name": "join-channel-request",
@@ -455,6 +455,133 @@
           "name": "resultsJson",
           "type": "string",
           "version": 2
+        }
+      ]
+    },
+    {
+      "name": "load-model-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "modelSrc",
+          "type": "string",
+          "version": 4
+        },
+        {
+          "name": "modelType",
+          "type": "string",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "load-model-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "modelId",
+          "type": "string",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "unload-model-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "modelId",
+          "type": "string",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "unload-model-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "success",
+          "type": "bool",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "infer-request",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "modelId",
+          "type": "string",
+          "version": 4
+        },
+        {
+          "name": "optionsJson",
+          "type": "string",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "infer-response",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "success",
+          "type": "bool",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "completion-stream",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "token",
+          "type": "string",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "completion-tool-call",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "call",
+          "type": "string",
+          "version": 4
+        }
+      ]
+    },
+    {
+      "name": "model-progress",
+      "namespace": "bolt",
+      "compact": false,
+      "flagsPosition": 0,
+      "fields": [
+        {
+          "name": "progressJson",
+          "type": "string",
+          "version": 4
         }
       ]
     }
