@@ -69,8 +69,12 @@ schemaNs.register({
     { name: 'thumbnailPath', type: 'string' },
     { name: 'channelKey', type: 'string' },
     { name: 'videoType', type: 'string' },
-    { name: 'opponentId', type: 'string' },
-    { name: 'score', type: 'string' },
+    { name: 'homeTeam', type: 'string' },
+    { name: 'awayTeam', type: 'string' },
+    { name: 'homeScore', type: 'string' },
+    { name: 'awayScore', type: 'string' },
+    { name: 'tournamentName', type: 'string' },
+    { name: 'matchDate', type: 'string' },
     { name: 'transcriptPath', type: 'string' },
     { name: 'eventsJson', type: 'string' }
   ]

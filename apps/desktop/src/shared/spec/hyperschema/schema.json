@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "schema": [
     {
       "name": "join-channel-request",
@@ -162,24 +162,44 @@
           "version": 3
         },
         {
-          "name": "opponentId",
+          "name": "homeTeam",
           "type": "string",
           "version": 3
         },
         {
-          "name": "score",
+          "name": "awayTeam",
           "type": "string",
           "version": 3
+        },
+        {
+          "name": "homeScore",
+          "type": "string",
+          "version": 3
+        },
+        {
+          "name": "awayScore",
+          "type": "string",
+          "version": 3
+        },
+        {
+          "name": "tournamentName",
+          "type": "string",
+          "version": 5
+        },
+        {
+          "name": "matchDate",
+          "type": "string",
+          "version": 5
         },
         {
           "name": "transcriptPath",
           "type": "string",
-          "version": 3
+          "version": 5
         },
         {
           "name": "eventsJson",
           "type": "string",
-          "version": 3
+          "version": 5
         }
       ]
     },
