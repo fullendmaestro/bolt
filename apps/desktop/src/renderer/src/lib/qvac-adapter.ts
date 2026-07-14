@@ -49,7 +49,7 @@ export function createQvacModelAdapter(
                 let done = false
 
                 const unsubscribeStream = window.qvacAPI.onCompletionStream((token) => {
-                    if (token === "") {
+                    if (!token) {
                         done = true
                     } else {
                         events.push({ type: "contentDelta", text: token })
@@ -64,9 +64,13 @@ export function createQvacModelAdapter(
                     resolve = null
                 })
 
-                await window.qvacAPI.startCompletion({
+                window.qvacAPI.startCompletion({
                     history: completionHistory,
                     stream: true
+                }).catch(err => {
+                    console.error("Completion error:", err)
+                    done = true
+                    resolve?.()
                 })
 
                 try {
