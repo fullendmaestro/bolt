@@ -24,42 +24,12 @@ contextBridge.exposeInMainWorld('qvacAPI', {
    * The main process fires 'completion-stream' events; a '' token signals end-of-stream.
    * tool-call events are signalled via 'completion-tool-call'.
    */
-  completion: (options: object) => ipcRenderer.invoke('completion', options).then(() => {
-    // Build an AsyncIterable over IPC events
-    const events: any[] = []
-    let resolve: (() => void) | null = null
-    let done = false
-
-    ipcRenderer.on('completion-stream', (_ev, token: string) => {
-      if (token === '') {
-        done = true
-      } else {
-        events.push({ type: 'contentDelta', text: token })
-      }
-      resolve?.()
-      resolve = null
-    })
-
-    ipcRenderer.on('completion-tool-call', (_ev, toolCall: any) => {
-      events.push({ type: 'toolCall', toolCall })
-      resolve?.()
-      resolve = null
-    })
-
-    async function* gen() {
-      while (!done || events.length > 0) {
-        if (events.length > 0) {
-          yield events.shift()
-        } else {
-          await new Promise<void>((r) => { resolve = r })
-        }
-      }
-      ipcRenderer.removeAllListeners('completion-stream')
-      ipcRenderer.removeAllListeners('completion-tool-call')
-    }
-
-    return { events: gen() }
-  }),
+  startCompletion: (options: object) => ipcRenderer.invoke('completion', options),
+  onCompletionToolCall: (cb: (toolCall: any) => void) => {
+    const listener = (_ev: any, toolCall: any) => cb(toolCall)
+    ipcRenderer.on('completion-tool-call', listener)
+    return () => ipcRenderer.removeListener('completion-tool-call', listener)
+  },
 
   // ── Channel Management ────────────────────────────────────
   joinChannel: (channelKey: string) => ipcRenderer.invoke('channel:join', channelKey),

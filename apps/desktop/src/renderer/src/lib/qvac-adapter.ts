@@ -42,21 +42,58 @@ export function createQvacModelAdapter(
             // 3. (Tools are now injected directly by the worker to avoid IPC Zod serialization issues)
 
             // 4. Run the completion (streaming)
-            const run = await window.qvacAPI.completion({
-                history,
-                stream: true
-            })
+            // Helper to build a local generator for completions
+            const runCompletion = async function* (completionHistory: any[]) {
+                const events: any[] = []
+                let resolve: (() => void) | null = null
+                let done = false
 
+                const unsubscribeStream = window.qvacAPI.onCompletionStream((token) => {
+                    if (token === "") {
+                        done = true
+                    } else {
+                        events.push({ type: "contentDelta", text: token })
+                    }
+                    resolve?.()
+                    resolve = null
+                })
+
+                const unsubscribeToolCall = window.qvacAPI.onCompletionToolCall((toolCall) => {
+                    events.push({ type: "toolCall", toolCall })
+                    resolve?.()
+                    resolve = null
+                })
+
+                await window.qvacAPI.startCompletion({
+                    history: completionHistory,
+                    stream: true
+                })
+
+                try {
+                    while (!done || events.length > 0) {
+                        if (events.length > 0) {
+                            yield events.shift()
+                        } else {
+                            await new Promise<void>((r) => { resolve = r })
+                        }
+                    }
+                } finally {
+                    unsubscribeStream()
+                    unsubscribeToolCall()
+                }
+            }
+
+            const run = runCompletion(history)
             let accumulatedText = ""
 
-            for await (const event of run.events) {
+            for await (const event of run) {
                 if (abortSignal?.aborted) break
 
                 if (event.type === "toolCall") {
                     // ── Tool interception: RAG search ──────────────────
                     try {
                         if (!event.toolCall) throw new Error("toolCall payload missing")
-                        const args = JSON.parse(event.toolCall.function.arguments)
+                        const args = event.toolCall.arguments || {}
                         const query: string = args.query || ""
 
                         const ragResults = await window.qvacAPI.ragQuery(
@@ -73,18 +110,19 @@ export function createQvacModelAdapter(
                         const continueHistory = [
                             ...history,
                             {
+                                role: "assistant",
+                                content: accumulatedText
+                            },
+                            {
                                 role: "tool",
                                 name: "search_video_transcript",
                                 content: ragContext
                             }
                         ]
 
-                        const followUp = await window.qvacAPI.completion({
-                            history: continueHistory,
-                            stream: true
-                        })
+                        const followUp = runCompletion(continueHistory)
 
-                        for await (const followEvent of followUp.events) {
+                        for await (const followEvent of followUp) {
                             if (abortSignal?.aborted) break
                             if (followEvent.type === "contentDelta") {
                                 accumulatedText += followEvent.text
@@ -100,6 +138,8 @@ export function createQvacModelAdapter(
                     yield { content: [{ type: "text", text: accumulatedText }] }
                 }
             }
+
+
         }
     }
 }

@@ -7,10 +7,10 @@ export interface CompletionEvent {
   text?: string
   /** Present when type === 'toolCall' */
   toolCall?: {
-    function: {
-      name: string
-      arguments: string
-    }
+    id: string
+    name: string
+    arguments: Record<string, any>
+    raw?: string
   }
 }
 
@@ -39,15 +39,16 @@ declare global {
       }) => Promise<string>
       infer: (history: { role: string; content: string }[], options?: { kvCache?: boolean; [key: string]: any }) => Promise<void>
       unloadModel: () => Promise<string>
-      onCompletionStream: (cb: (token: string) => void) => void
-      onModelProgress: (cb: (progress: any) => void) => void
+      onCompletionStream: (cb: (token: string) => void) => () => void
+      onCompletionToolCall: (cb: (toolCall: any) => void) => () => void
+      onModelProgress: (cb: (progress: any) => void) => () => void
       removeModelProgressListener: () => void
       ragQuery: (workspaceId: string, query: string) => Promise<any[]>
-      completion: (options: {
+      startCompletion: (options: {
         history: { role: string; content: string; name?: string }[]
         stream: boolean
         tools?: object[]
-      }) => Promise<CompletionRun>
+      }) => Promise<void>
 
       // Channel Management
       joinChannel: (channelKey: string) => Promise<void>
