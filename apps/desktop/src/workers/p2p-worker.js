@@ -22,9 +22,6 @@ const BlobServer = require('hypercore-blob-server')
 const Autobase = require('autobase')
 const BlindPeering = require('blind-peering')
 
-import parakeetPlugin from '@qvac/bare-sdk/parakeet-transcription/plugin';
-import embeddingsPlugin from '@qvac/bare-sdk/llamacpp-embedding/plugin';
-
 const {
   loadModel,
   unloadModel,
@@ -44,8 +41,17 @@ const {
 
 async function initAI() {
   try {
-    registerPlugin(parakeetPlugin);
-    registerPlugin(embeddingsPlugin);
+    const parakeetModule = await import('@qvac/bare-sdk/parakeet-transcription/plugin');
+    const embeddingsModule = await import('@qvac/bare-sdk/llamacpp-embedding/plugin');
+
+    const parakeet = parakeetModule.parakeetPlugin || parakeetModule.default || parakeetModule;
+    const embeddings = embeddingsModule.embeddingsPlugin || embeddingsModule.default || embeddingsModule;
+
+    plugins([
+      parakeet,
+      embeddings
+    ]);
+
     console.log("P2P Worker plugins registered successfully!");
   } catch (err) {
     console.error("Failed to initialize AI plugins:", err);

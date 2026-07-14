@@ -9,6 +9,7 @@
     "dev": "pnpm -F desktop dev",
     "dev:peers": "turbo run dev:pear1 dev:pear2 dev:pear3 --ui=tui",
     "build": "pnpm -F desktop build",
+    "build:rpc": "pnpm -F desktop build:rpc",
     "preview": "pnpm -F desktop start",
     "preview:peers": "pnpm build && concurrently -c \"bgBlue.bold,bgMagenta.bold,bgYellow.bold\" -n \"SEEDER,PEER-1,PEER-2\" \"pnpm -F desktop start -- --user-data-dir=./.data/seeder\" \"pnpm -F desktop start -- --user-data-dir=./.data/peer1\" \"pnpm -F desktop start -- --user-data-dir=./.data/peer2\"",
     "clean:data": "node -e \"fs.rmSync('apps/desktop/.data', { recursive: true, force: true })\""
