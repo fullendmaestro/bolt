@@ -295,20 +295,23 @@ export function Assistant({
           />
 
           {/* Chat ↔ Stats toggle */}
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             id="view-mode-toggle"
             onClick={() => setViewMode((v) => v === 'chat' ? 'stats' : 'chat')}
             title={viewMode === 'chat' ? 'Show stats' : 'Show chat'}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`h-8 rounded-full px-3 border border-border/50 transition-colors ${
               viewMode === 'stats'
-                ? 'bg-indigo-500/20 text-indigo-400'
-                : 'hover:bg-secondary text-muted-foreground'
+                ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
             }`}
           >
             {viewMode === 'chat'
-              ? <BarChart2 size={20} />
-              : <MessageSquare size={20} />}
-          </button>
+              ? <BarChart2 size={16} />
+              : <MessageSquare size={16} />}
+          </Button>
         </header>
 
         <div className="flex-1 overflow-hidden">
