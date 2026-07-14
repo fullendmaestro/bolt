@@ -1,6 +1,5 @@
 import { ChatModelAdapter } from "@assistant-ui/react"
 import type { ChannelEvent } from "../../../shared/types"
-import { z } from "zod"
 
 /**
  * Creates a QVAC model adapter that:
@@ -50,9 +49,16 @@ export function createQvacModelAdapter(
                             description:
                                 "Search the current video's transcript for specific keywords, events, or timestamps. " +
                                 "Use this whenever the user asks about something that happened in the video.",
-                            parameters: z.object({
-                                query: z.string().describe("The keywords or phrase to search for in the transcript")
-                            })
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    query: {
+                                        type: "string",
+                                        description: "The keywords or phrase to search for in the transcript"
+                                    }
+                                },
+                                required: ["query"]
+                            }
                         }
                     }
                 ]

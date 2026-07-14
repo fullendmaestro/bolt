@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
+import { z } from 'zod'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
@@ -145,6 +146,17 @@ function setupHandlers(): void {
 
   ipcMain.handle('completion', async (_event, options: any = {}) => {
     if (!modelId) throw new Error('Model not loaded.')
+
+    if (options.tools && Array.isArray(options.tools)) {
+      options.tools = options.tools.map((t: any) => {
+        if (t.function?.name === 'search_video_transcript') {
+          t.function.parameters = z.object({
+            query: z.string().describe("The keywords or phrase to search for in the transcript")
+          })
+        }
+        return t
+      })
+    }
 
     const result = await completion({ modelId, stream: true, ...options })
     for await (const event of result.events || []) {

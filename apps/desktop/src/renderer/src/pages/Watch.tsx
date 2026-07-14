@@ -18,7 +18,8 @@ export function Watch({
 }) {
   const { id } = useParams()
   const location = useLocation()
-  const stream = location.state?.stream
+  const initialStream = location.state?.stream
+  const [stream, setStream] = useState<any>(initialStream)
   
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
@@ -58,6 +59,15 @@ export function Watch({
       } else if (msg.type === 'error' && msg.command === 'download-video') {
         setDownloadState('idle')
         toast.error(`Download failed: ${msg.message}`)
+      } else if (msg.type === 'uploads-data' && msg.channel?.publicKey === channelKey) {
+        const video = msg.channel.videos.find((v: any) => v.id === videoId)
+        if (video) {
+          setStream({
+            ...video,
+            channel: msg.channel.name,
+            avatar: msg.channel.avatar
+          })
+        }
       }
     }
 
@@ -68,6 +78,10 @@ export function Watch({
     window.qvacAPI.onP2PMessage(handleMessage)
     window.qvacAPI.onChannelEvent(handleChannelEvent)
     window.qvacAPI.getStreamUrl(channelKey, videoId)
+    
+    if (!stream && channelKey) {
+      window.qvacAPI.getUploads(channelKey)
+    }
 
     return () => {
       window.qvacAPI.removeP2PMessageListener()
@@ -168,7 +182,29 @@ export function Watch({
           <h1 className="text-xl font-bold text-[#F1F1F1] line-clamp-2 leading-tight">
             {displayTitle}
           </h1>
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          
+          {/* Game Stats */}
+          {stream && (stream.videoType || stream.opponentId || stream.score) && (
+            <div className="flex flex-wrap items-center gap-3">
+              {stream.videoType && (
+                <div className="bg-white/10 rounded-full px-3 py-1 text-xs font-medium text-[#F1F1F1]">
+                  Match: {stream.videoType}
+                </div>
+              )}
+              {stream.opponentId && (
+                <div className="bg-white/10 rounded-full px-3 py-1 text-xs font-medium text-[#F1F1F1]">
+                  Vs: {stream.opponentId}
+                </div>
+              )}
+              {stream.score && (
+                <div className="bg-white/10 rounded-full px-3 py-1 text-xs font-medium text-[#F1F1F1]">
+                  Score: {stream.score}
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-1">
             <div className="flex items-center gap-3">
               {displayAvatar ? (
                 <img
