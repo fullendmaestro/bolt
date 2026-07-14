@@ -321,6 +321,10 @@ export function Watch({
             channelKey={channelKey}
             currentVideoWorkspaceId={videoId ? `rag-${videoId}` : undefined}
             currentVideoTitle={stream?.title}
+            channelName={displayChannel}
+            channelAvatar={displayAvatar}
+            currentVideo={stream}
+            videoRef={videoRef}
           />
         </div>
       </div>

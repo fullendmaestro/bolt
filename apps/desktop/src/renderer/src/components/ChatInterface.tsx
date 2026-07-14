@@ -11,9 +11,24 @@ interface ChatInterfaceProps {
     channelKey?: string | null
     currentVideoWorkspaceId?: string
     currentVideoTitle?: string
+    channelName?: string | null
+    channelAvatar?: string | null
+    currentVideo?: any | null
+    videoRef?: React.RefObject<HTMLVideoElement | null>
 }
 
-export function ChatInterface({ modelStatus, modelProgress, loadModel, channelKey, currentVideoWorkspaceId, currentVideoTitle }: ChatInterfaceProps): React.JSX.Element {
+export function ChatInterface({ 
+    modelStatus, 
+    modelProgress, 
+    loadModel, 
+    channelKey, 
+    currentVideoWorkspaceId, 
+    currentVideoTitle,
+    channelName,
+    channelAvatar,
+    currentVideo,
+    videoRef
+}: ChatInterfaceProps): React.JSX.Element {
     // Accumulate channel events for AI context injection
     const channelEventsRef = useRef<ChannelEvent[]>([])
 
@@ -81,7 +96,14 @@ export function ChatInterface({ modelStatus, modelProgress, loadModel, channelKe
                 ) : (
                     /* Tailoring assistant-ui styles to sit perfectly inside the dark YouTube design language */
                     <div className="h-full w-full [&_.aui-thread]:h-full [&_.aui-thread]:bg-[#0F0F0F] [&_.aui-thread-viewport]:px-4 [&_.aui-text-muted]:text-neutral-500">
-                        <Assistant runtime={runtime} />
+                        <Assistant 
+                            runtime={runtime} 
+                            channelKey={channelKey}
+                            channelName={channelName}
+                            channelAvatar={channelAvatar}
+                            currentVideo={currentVideo}
+                            videoRef={videoRef}
+                        />
                     </div>
                 )}
             </div>
