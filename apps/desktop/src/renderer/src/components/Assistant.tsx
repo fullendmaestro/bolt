@@ -5,14 +5,22 @@ import {
   ChevronDown,
   MessageSquare,
   BarChart2,
-  Shield,
-  Cpu,
+  MonitorSmartphone,
+  XIcon,
   type LucideIcon,
 } from 'lucide-react'
 
 import { Thread } from './assistant-ui/thread'
 import type { VideoEntry, VideoTimelineEvent } from '../../../shared/types'
 import { VIDEO_TYPES, getOpponentById } from '../../../shared/constants'
+import { Button } from './ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
 
 // ── Delegate types ──────────────────────────────────────────
 
@@ -44,59 +52,68 @@ interface SelectDelegateProps {
   onSelect: (d: Delegate) => void
 }
 
-function DelegateIcon({ d, size = 16 }: { d: Delegate; size?: number }) {
+function DelegateIcon({ d, size = 16, className = "" }: { d: Delegate; size?: number, className?: string }) {
   if (d.kind === 'avatar') {
     return (
       <img
         src={d.avatarSrc}
         alt={d.name}
         style={{ width: size, height: size }}
-        className="rounded-full object-cover shrink-0"
+        className={`rounded-full object-cover shrink-0 ${className}`}
       />
     )
   }
   const Icon = d.icon
-  return <Icon size={size} className="text-muted-foreground shrink-0" />
+  return <Icon size={size} className={`shrink-0 ${className}`} />
 }
 
 function SelectDelegate({ selected, delegates, onSelect }: SelectDelegateProps) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="relative">
-      <button
-        id="delegate-selector"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-8 rounded-full gap-1.5 px-3 border border-border/50 text-muted-foreground hover:text-foreground hover:bg-accent/50 text-xs font-medium transition-colors"
+        onClick={() => setOpen(true)}
       >
-        <DelegateIcon d={selected} />
-        <span className="font-medium text-sm">{selected.name}</span>
-        <ChevronDown size={14} className="text-muted-foreground" />
-      </button>
+        <DelegateIcon d={selected} size={14} className="text-primary/70" />
+        <ChevronDown size={14} className="opacity-60 ml-0.5" />
+      </Button>
 
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-2 w-64 bg-background border rounded-lg shadow-xl z-50 overflow-hidden">
-            {delegates.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => { onSelect(d); setOpen(false) }}
-                className={`w-full px-4 py-3 text-left hover:bg-secondary/50 transition-colors flex items-center gap-3 ${
-                  selected.id === d.id ? 'bg-secondary/30' : ''
-                }`}
-              >
-                <DelegateIcon d={d} size={16} />
-                <div className="flex flex-col min-w-0">
-                  <div className="font-medium text-sm truncate">{d.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{d.description}</div>
-                </div>
-              </button>
-            ))}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden bg-card">
+          <div className="p-6 pb-4">
+            <DialogHeader className="mb-6 text-center">
+              <DialogTitle className="text-xl font-medium text-center">
+                Select AI Delegate
+              </DialogTitle>
+              <DialogDescription className="text-center">
+                Choose who processes your queries.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-3">
+              {delegates.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => { onSelect(d); setOpen(false) }}
+                  className={`flex items-center gap-3 p-3 rounded-lg border bg-background text-sm shadow-sm relative overflow-hidden text-left hover:bg-secondary/50 transition-colors ${selected.id === d.id ? 'border-primary' : ''}`}
+                >
+                  <DelegateIcon d={d} size={20} className="text-primary shrink-0 z-10" />
+                  <div className="flex-1 min-w-0 z-10">
+                    <span className="font-medium truncate block max-w-full">{d.name}</span>
+                    <span className="text-xs text-muted-foreground truncate block max-w-full">{d.description}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </>
-      )}
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -226,7 +243,7 @@ export function Assistant({
       id: 'local',
       name: 'Local',
       description: 'Run inference on this machine',
-      icon: Shield,
+      icon: MonitorSmartphone,
     },
     ...(channelKey && channelName
       ? [{
@@ -243,7 +260,7 @@ export function Assistant({
       id: 'custom',
       name: 'Custom',
       description: 'Enter a provider key manually',
-      icon: Cpu,
+      icon: XIcon,
     },
   ]
 
