@@ -40,14 +40,16 @@ A decentralized, peer-to-peer sports streaming platform built on the Holepunch s
 1. Install dependencies across the monorepo:
 ```bash
 pnpm install
-
 ```
 
+2. Build the initial worker and RPC bindings (this creates `worker.js` and other necessary compiled files):
+```bash
+pnpm run build
+```
 
-2. Run the standard development environment:
+3. Run the standard development environment:
 ```bash
 pnpm run dev
-
 ```
 
 
