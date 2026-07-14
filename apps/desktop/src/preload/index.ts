@@ -52,8 +52,12 @@ contextBridge.exposeInMainWorld('qvacAPI', {
     title?: string
     thumbnailPath?: string
     videoType?: string
-    opponentId?: string
-    score?: string
+    homeTeam?: string
+    awayTeam?: string
+    homeScore?: string
+    awayScore?: string
+    tournamentName?: string
+    matchDate?: string
     transcriptPath?: string
     eventsJson?: string
   }) => ipcRenderer.invoke('video:select-and-upload', meta),

@@ -12,7 +12,8 @@ import {
 
 import { Thread } from './assistant-ui/thread'
 import type { VideoEntry, VideoTimelineEvent } from '../../../shared/types'
-import { VIDEO_TYPES, getOpponentById } from '../../../shared/constants'
+
+import { footballTeams } from '../lib/const'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -125,90 +126,120 @@ interface VideoStatsProps {
 }
 
 function VideoStats({ video, videoRef }: VideoStatsProps) {
-  const opponent = video.opponentId ? getOpponentById(video.opponentId) : null
   const events: VideoTimelineEvent[] = (() => {
     try { return video.eventsJson ? JSON.parse(video.eventsJson) : [] }
     catch { return [] }
   })()
 
-  const typeLabel =
-    video.videoType === VIDEO_TYPES.FULL_TOURNAMENT ? 'Full Match'
-    : video.videoType === VIDEO_TYPES.CLIP ? 'Clip'
-    : video.videoType || 'Video'
-
   const seek = (secs: number) => {
     if (videoRef.current) videoRef.current.currentTime = secs
   }
 
+  const homeTeamDef = footballTeams.find(t => t.name === video.homeTeam)
+  const awayTeamDef = footballTeams.find(t => t.name === video.awayTeam)
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto px-4 py-5 gap-5 text-sm">
-      {/* Match header */}
-      <div className="flex flex-col items-center gap-3 pb-4 border-b border-border">
-        <div className="flex items-center justify-center gap-6 w-full">
-          {/* Home side — placeholder "My Team" */}
-          <div className="flex flex-col items-center gap-1 flex-1">
-            <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-lg">⚽</div>
-            <span className="text-xs font-medium text-center leading-tight">My Team</span>
-          </div>
-
-          {/* Score */}
-          <div className="flex flex-col items-center gap-1">
-            {video.score ? (
-              <span className="text-2xl font-bold tracking-wide text-foreground">{video.score}</span>
-            ) : (
-              <span className="text-xs text-muted-foreground">No score</span>
-            )}
-          </div>
-
-          {/* Opponent side */}
-          <div className="flex flex-col items-center gap-1 flex-1">
-            {opponent ? (
+    <div className="flex flex-col h-full overflow-y-auto bg-[#F9FAFB] text-sm rounded-lg border border-border/40">
+      {/* Match header scoreboard block */}
+      <div className="bg-white rounded-t-lg shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border-b border-border/60 py-5 px-4">
+        <div className="flex items-center justify-between w-full">
+          {/* Home side */}
+          <div className="flex flex-1 items-center justify-start gap-3">
+            {homeTeamDef ? (
               <>
-                <img src={opponent.icon} alt={opponent.name}
-                  className="w-10 h-10 rounded-full object-cover bg-secondary"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                />
-                <span className="text-xs font-medium text-center leading-tight">{opponent.name}</span>
+                <img src={homeTeamDef.crestUrl} alt={video.homeTeam || 'Home Team'} className="w-10 h-10 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <span className="text-sm font-bold uppercase tracking-wide truncate max-w-[100px] hidden sm:block">{video.homeTeam || 'Home'}</span>
               </>
             ) : (
               <>
-                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-lg">🏟️</div>
-                <span className="text-xs text-muted-foreground">Opponent</span>
+                <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-lg shadow-sm border border-neutral-200">⚽</div>
+                <span className="text-sm font-bold uppercase tracking-wide truncate hidden sm:block">My Team</span>
+              </>
+            )}
+          </div>
+
+          {/* Score */}
+          <div className="flex flex-col items-center justify-center px-4">
+            {video.homeScore && video.awayScore ? (
+              <div className="flex items-center gap-3 text-3xl font-black text-neutral-800 tracking-tight">
+                <span>{video.homeScore}</span>
+                <span className="text-neutral-300 font-medium text-xl">-</span>
+                <span>{video.awayScore}</span>
+              </div>
+            ) : (
+              <span className="text-sm font-medium text-neutral-400">vs</span>
+            )}
+            <div className="text-xs text-neutral-500 font-medium mt-1">{video.matchDate || 'Full Time'}</div>
+          </div>
+
+          {/* Away side */}
+          <div className="flex flex-1 items-center justify-end gap-3">
+            {awayTeamDef ? (
+              <>
+                <span className="text-sm font-bold uppercase tracking-wide truncate max-w-[100px] hidden sm:block text-right">{video.awayTeam || 'Away'}</span>
+                <img src={awayTeamDef.crestUrl} alt={video.awayTeam || 'Away'} className="w-10 h-10 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              </>
+            ) : (
+              <>
+                <span className="text-sm font-bold uppercase tracking-wide truncate hidden sm:block text-right">Opponent</span>
+                <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-lg shadow-sm border border-neutral-200">🏟️</div>
               </>
             )}
           </div>
         </div>
-
-        {/* Video type badge */}
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-          {typeLabel}
-        </span>
       </div>
 
       {/* Timeline */}
-      <div className="flex flex-col gap-1">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+      <div className="flex flex-col flex-1 p-5">
+        <h3 className="text-sm font-bold text-neutral-800 mb-6 flex items-center gap-2">
           Match Timeline
         </h3>
 
         {events.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic">No timeline events were provided for this video.</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-neutral-400 opacity-60 mt-10">
+            <span className="text-xs italic">No timeline events were provided for this video.</span>
+          </div>
         ) : (
-          <ol className="relative border-l border-border ml-3 flex flex-col gap-0">
-            {events.map((evt, i) => (
-              <li key={i} className="mb-0">
-                <button
-                  onClick={() => seek(evt.videoTimeSecs)}
-                  className="group flex items-start gap-3 w-full text-left pl-4 py-2.5 hover:bg-secondary/40 rounded-r-lg transition-colors relative"
-                >
-                  {/* Dot */}
-                  <span className="absolute -left-[5px] top-3.5 w-2.5 h-2.5 rounded-full bg-indigo-500 border-2 border-background group-hover:scale-125 transition-transform" />
-                  <span className="text-xs font-mono text-indigo-400 shrink-0 pt-0.5 w-12">{evt.timestamp}</span>
-                  <span className="text-xs text-foreground leading-relaxed">{evt.label}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
+          <div className="relative pl-3">
+            {/* Vertical line connecting events */}
+            <div className="absolute left-[29px] sm:left-[35px] top-4 bottom-4 w-0.5 bg-neutral-200" />
+            
+            <ol className="relative flex flex-col gap-6 w-full">
+              {events.map((evt, i) => {
+                const isGoal = evt.label.toLowerCase() === 'goal'
+                const isYellow = evt.label.toLowerCase() === 'yellow card'
+                const isRed = evt.label.toLowerCase() === 'red card'
+                const isSub = evt.label.toLowerCase() === 'substitution'
+                
+                return (
+                  <li key={i} className="flex items-center gap-4 group cursor-pointer" onClick={() => seek(evt.videoTimeSecs)}>
+                    <div className="w-10 sm:w-12 flex justify-end shrink-0 text-neutral-600 font-bold text-[13px] group-hover:text-indigo-600 transition-colors">
+                      {evt.timestamp}'
+                    </div>
+                    
+                    <div className="relative z-10 shrink-0 w-[22px] h-[22px] rounded-full bg-white border-2 border-indigo-500 shadow-sm flex items-center justify-center group-hover:scale-110 group-hover:border-indigo-600 group-hover:bg-indigo-50 transition-all">
+                      {isGoal && <span className="text-[10px]">⚽</span>}
+                      {isYellow && <div className="w-2.5 h-3.5 bg-yellow-400 rounded-sm" />}
+                      {isRed && <div className="w-2.5 h-3.5 bg-red-500 rounded-sm" />}
+                      {isSub && <span className="text-[10px]">🔄</span>}
+                      {!isGoal && !isYellow && !isRed && !isSub && <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />}
+                    </div>
+
+                    <div className="bg-white border border-neutral-200 rounded-lg py-2 px-3 shadow-sm flex-1 min-w-0 group-hover:border-indigo-200 transition-colors">
+                      <div className="flex flex-col">
+                        <span className="text-xs sm:text-[13px]">
+                          <span className="font-bold text-neutral-800 mr-1">{evt.label}:</span>
+                          <span className="text-neutral-600 truncate inline-block max-w-[200px] align-bottom">
+                            {evt.playerName || 'Player'}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
         )}
       </div>
     </div>

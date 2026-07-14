@@ -252,8 +252,12 @@ function setupHandlers(): void {
     title?: string
     thumbnailPath?: string
     videoType?: string
-    opponentId?: string
-    score?: string
+    homeTeam?: string
+    awayTeam?: string
+    homeScore?: string
+    awayScore?: string
+    tournamentName?: string
+    matchDate?: string
     transcriptPath?: string
     eventsJson?: string
   }) => {
@@ -275,8 +279,12 @@ function setupHandlers(): void {
       thumbnailPath: meta?.thumbnailPath || '',
       channelKey: '',
       videoType: meta?.videoType || '',
-      opponentId: meta?.opponentId || '',
-      score: meta?.score || '',
+      homeTeam: meta?.homeTeam || '',
+      awayTeam: meta?.awayTeam || '',
+      homeScore: meta?.homeScore || '',
+      awayScore: meta?.awayScore || '',
+      tournamentName: meta?.tournamentName || '',
+      matchDate: meta?.matchDate || '',
       transcriptPath: meta?.transcriptPath || '',
       eventsJson: meta?.eventsJson || ''
     }).then((res) => {

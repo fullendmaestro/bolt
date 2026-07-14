@@ -11,6 +11,8 @@ export interface VideoTimelineEvent {
   timestamp: string
   /** Seconds into the video for programmatic seeking */
   videoTimeSecs: number
+  /** Player name involved in the event */
+  playerName?: string
 }
 
 /** A single video entry stored inside a Channel's Hyperdrive metadata */
@@ -35,10 +37,18 @@ export interface VideoEntry {
   thumbnailPath?: string
   /** Video type: 'full_tournament' | 'clip' */
   videoType?: string
-  /** Opponent team identifier (see OPPONENTS constant) */
-  opponentId?: string
-  /** Match score string e.g. "2-1" */
-  score?: string
+  /** Home team ID/name */
+  homeTeam?: string
+  /** Away team ID/name */
+  awayTeam?: string
+  /** Final score for the home team */
+  homeScore?: string
+  /** Final score for the away team */
+  awayScore?: string
+  /** Name of the tournament/competition */
+  tournamentName?: string
+  /** Match date (e.g. 07/13/2026) */
+  matchDate?: string
   /** Absolute path to a pre-existing transcript file (skips Parakeet) */
   transcriptPath?: string
   /** Serialized JSON array of VideoTimelineEvent — user-supplied at upload */
@@ -88,7 +98,7 @@ export type P2PCommand =
   | { type: 'leave-channel'; channelKey: string }
   | { type: 'get-feed' }
   | { type: 'init-channel'; name: string; description: string; avatarPath?: string }
-  | { type: 'upload-video'; filePath: string; title: string; duration: string; thumbnailPath?: string }
+  | { type: 'upload-video'; filePath: string; title: string; duration: string; thumbnailPath?: string; videoType?: string; homeTeam?: string; awayTeam?: string; homeScore?: string; awayScore?: string; tournamentName?: string; matchDate?: string; eventsJson?: string; transcriptPath?: string }
   | { type: 'get-uploads' }
   | { type: 'start-stream'; channelKey: string; videoId: string }
   | { type: 'inject-event'; event: Omit<ChannelEvent, 'channelKey'> }

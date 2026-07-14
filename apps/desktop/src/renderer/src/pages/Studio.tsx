@@ -16,7 +16,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { ChannelMetadata, VideoEntry, VideoTimelineEvent } from '../../../shared/types'
-import { VIDEO_TYPES, OPPONENTS } from '../../../shared/constants'
+import { VIDEO_TYPES } from '../../../shared/constants'
+import { footballTeams } from '../lib/const'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,10 +60,18 @@ export function Studio() {
   // Upload state
   const [thumbnailPath, setThumbnailPath] = useState<string | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+  
+  // Wizard state
+  const [uploadStep, setUploadStep] = useState<1 | 2>(1)
+  
   // New metadata fields
   const [videoType, setVideoType] = useState<string>(VIDEO_TYPES.FULL_TOURNAMENT)
-  const [opponentId, setOpponentId] = useState<string>('')
-  const [score, setScore] = useState<string>('')
+  const [homeTeam, setHomeTeam] = useState<string>('')
+  const [awayTeam, setAwayTeam] = useState<string>('')
+  const [homeScore, setHomeScore] = useState<string>('')
+  const [awayScore, setAwayScore] = useState<string>('')
+  const [tournamentName, setTournamentName] = useState<string>('')
+  const [matchDate, setMatchDate] = useState<string>('')
   const [transcriptPath, setTranscriptPath] = useState<string | null>(null)
   const [timelineEvents, setTimelineEvents] = useState<VideoTimelineEvent[]>([])
 
@@ -216,8 +225,12 @@ export function Studio() {
         title: uploadTitle || 'Untitled Upload',
         thumbnailPath: thumbnailPath || undefined,
         videoType,
-        opponentId: opponentId || undefined,
-        score: score || undefined,
+        homeTeam: homeTeam || undefined,
+        awayTeam: awayTeam || undefined,
+        homeScore: homeScore || undefined,
+        awayScore: awayScore || undefined,
+        tournamentName: tournamentName || undefined,
+        matchDate: matchDate || undefined,
         transcriptPath: transcriptPath || undefined,
         eventsJson: timelineEvents.length > 0 ? JSON.stringify(timelineEvents) : undefined,
       })
@@ -229,8 +242,13 @@ export function Studio() {
         setThumbnailPreview(null)
         setTranscriptPath(null)
         setTimelineEvents([])
-        setScore('')
-        setOpponentId('')
+        setHomeTeam('')
+        setAwayTeam('')
+        setHomeScore('')
+        setAwayScore('')
+        setTournamentName('')
+        setMatchDate('')
+        setUploadStep(1)
       }
     } catch (err) {
       console.error('Upload failed:', err)
@@ -360,193 +378,198 @@ export function Studio() {
         }
         setShowUploadModal(open)
       }}>
-        <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto bg-[#1a1a1a] border-neutral-800 text-white">
-          <DialogHeader>
-            <DialogTitle>Upload to {channelData?.name}</DialogTitle>
-            <DialogDescription className="text-neutral-400">
-              Seed a new video and provide match metadata for the AI assistant.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto bg-[#1a1a1a] border-neutral-800 text-white p-0">
+          <div className="p-6 border-b border-neutral-800 flex justify-between items-center">
+            <DialogTitle className="text-xl">Seed New Video</DialogTitle>
+          </div>
 
-          <div className="grid gap-5 py-4">
-
-            {/* Title */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-neutral-400 uppercase">Video Title</label>
-              <Input
-                value={uploadTitle}
-                onChange={(e) => setUploadTitle(e.target.value)}
-                placeholder="e.g. Match Highlights vs Arsenal"
-                className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 rounded-lg"
-                disabled={uploading}
-              />
-            </div>
-
-            {/* Thumbnail */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-neutral-400 uppercase">Thumbnail</label>
-              <div className="flex items-center gap-3">
-                {thumbnailPreview ? (
-                  <div className="relative h-16 w-28 rounded-lg overflow-hidden shrink-0 border border-neutral-700 bg-black">
-                    <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
-                    {!uploading && (
-                      <button
-                        onClick={() => { setThumbnailPath(null); setThumbnailPreview(null) }}
-                        className="absolute top-1 right-1 bg-black/70 rounded-full p-1 text-white hover:bg-black"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="h-16 w-28 rounded-lg border-2 border-dashed border-neutral-700 bg-[#0F0F0F] flex items-center justify-center shrink-0">
-                    <ImagePlus className="h-5 w-5 text-neutral-600" />
-                  </div>
+          <div className="px-6 py-4">
+            {/* Steps indicator */}
+            <div className="flex bg-neutral-900 rounded-lg overflow-hidden mb-6 text-sm font-medium">
+              <button
+                onClick={() => setUploadStep(1)}
+                className={`flex-1 py-2 px-4 flex items-center justify-center gap-2 relative ${uploadStep === 1 ? 'text-white' : 'text-neutral-400'}`}
+              >
+                1. Media {uploadStep === 2 && <Check className="h-4 w-4 text-emerald-400" />}
+                {uploadStep === 1 && (
+                  <div className="absolute top-0 bottom-0 right-0 w-4 bg-indigo-500 clip-arrow-right"></div>
                 )}
-                <Button type="button" variant="secondary" onClick={handleSelectThumbnail} disabled={uploading}
-                  className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs">
-                  {thumbnailPreview ? 'Change' : 'Add Thumbnail'}
-                </Button>
-              </div>
+              </button>
+              <button
+                onClick={() => setUploadStep(2)}
+                className={`flex-1 py-2 px-4 flex items-center justify-center gap-2 ${uploadStep === 2 ? 'bg-indigo-500 text-white' : 'text-neutral-500'}`}
+              >
+                2. Match Stats
+              </button>
             </div>
 
-            {/* Divider: Match Metadata */}
-            <div className="border-t border-neutral-800 pt-2">
-              <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Match Metadata</p>
-
-              {/* Video Type */}
-              <div className="flex flex-col gap-2 mb-3">
-                <label className="text-xs font-semibold text-neutral-400 uppercase">Video Type</label>
-                <div className="flex gap-2">
-                  {Object.entries(VIDEO_TYPES).map(([key, val]) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setVideoType(val)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        videoType === val
-                          ? 'bg-indigo-500/20 border-indigo-500/60 text-indigo-300'
-                          : 'bg-[#0F0F0F] border-neutral-700 text-neutral-400 hover:border-neutral-500'
-                      }`}
-                    >
-                      {key === 'FULL_TOURNAMENT' ? 'Full Match' : 'Clip'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Opponent + Score row */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
+            {uploadStep === 1 ? (
+              <div className="grid gap-5">
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-neutral-400 uppercase">Opponent</label>
-                  <select
-                    value={opponentId}
-                    onChange={(e) => setOpponentId(e.target.value)}
-                    disabled={uploading}
-                    className="bg-[#0F0F0F] border border-neutral-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">None / Custom</option>
-                    {Object.values(OPPONENTS).map(opp => (
-                      <option key={opp.id} value={opp.id}>{opp.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-neutral-400 uppercase">Score</label>
+                  <label className="text-xs font-semibold text-neutral-400 uppercase">Video Title</label>
                   <Input
-                    value={score}
-                    onChange={(e) => setScore(e.target.value)}
-                    placeholder="e.g. 2-1"
-                    disabled={uploading}
+                    value={uploadTitle}
+                    onChange={(e) => setUploadTitle(e.target.value)}
+                    placeholder="e.g. Match Highlights vs Arsenal"
                     className="bg-[#0F0F0F] border-neutral-700 text-white focus-visible:ring-indigo-500 rounded-lg"
+                    disabled={uploading}
                   />
                 </div>
-              </div>
 
-              {/* Transcript */}
-              <div className="flex flex-col gap-2 mb-1">
-                <label className="text-xs font-semibold text-neutral-400 uppercase">Transcript (optional)</label>
-                <div className="flex items-center gap-3">
-                  <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-xs truncate ${
-                    transcriptPath ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-300' : 'border-neutral-700 bg-[#0F0F0F] text-neutral-500'
-                  }`}>
-                    <FileText className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{transcriptPath ? transcriptPath.split('/').pop() : 'No file selected — Parakeet will auto-transcribe'}</span>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-neutral-400 uppercase">Thumbnail</label>
+                  <div className="flex items-center gap-3">
+                    {thumbnailPreview ? (
+                      <div className="relative h-16 w-28 rounded-lg overflow-hidden shrink-0 border border-neutral-700 bg-black">
+                        <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                        {!uploading && (
+                          <button onClick={() => { setThumbnailPath(null); setThumbnailPreview(null) }} className="absolute top-1 right-1 bg-black/70 rounded-full p-1 text-white hover:bg-black">
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="h-16 w-28 rounded-lg border-2 border-dashed border-neutral-700 bg-[#0F0F0F] flex items-center justify-center shrink-0">
+                        <ImagePlus className="h-5 w-5 text-neutral-600" />
+                      </div>
+                    )}
+                    <Button type="button" variant="secondary" onClick={handleSelectThumbnail} disabled={uploading} className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs">
+                      {thumbnailPreview ? 'Change' : 'Add Thumbnail'}
+                    </Button>
                   </div>
-                  <Button type="button" variant="secondary" onClick={handleSelectTranscript} disabled={uploading}
-                    className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs shrink-0">
-                    Browse
-                  </Button>
-                  {transcriptPath && (
-                    <button onClick={() => setTranscriptPath(null)} className="text-neutral-500 hover:text-neutral-300">
-                      <X className="h-4 w-4" />
+                </div>
+
+                {/* Transcript */}
+                <div className="flex flex-col gap-2 mb-1">
+                  <label className="text-xs font-semibold text-neutral-400 uppercase">Transcript (optional)</label>
+                  <div className="flex items-center gap-3">
+                    <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-xs truncate ${transcriptPath ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-300' : 'border-neutral-700 bg-[#0F0F0F] text-neutral-500'}`}>
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{transcriptPath ? transcriptPath.split('/').pop() : 'No file selected — Parakeet will auto-transcribe'}</span>
+                    </div>
+                    <Button type="button" variant="secondary" onClick={handleSelectTranscript} disabled={uploading} className="bg-neutral-800 hover:bg-neutral-700 text-white border-none text-xs shrink-0">
+                      Browse
+                    </Button>
+                    {transcriptPath && (
+                      <button onClick={() => setTranscriptPath(null)} className="text-neutral-500 hover:text-neutral-300"><X className="h-4 w-4" /></button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-5">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-neutral-400 uppercase">Video Type</label>
+                  <div className="flex bg-[#0F0F0F] p-1 rounded-lg border border-neutral-800 gap-1">
+                    {Object.entries(VIDEO_TYPES).map(([key, val]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setVideoType(val)}
+                        className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors ${videoType === val ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}
+                      >
+                        {key === 'FULL_TOURNAMENT' ? 'Full Tournament' : 'Clip'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase">Home Team</label>
+                    <div className="relative">
+                      <select value={homeTeam} onChange={e => setHomeTeam(e.target.value)} disabled={uploading} className="w-full bg-[#0F0F0F] border border-neutral-700 text-white text-sm rounded-lg pl-10 pr-3 py-2 appearance-none">
+                        <option value="">Select Team</option>
+                        {footballTeams.map(t => (
+                          <option key={t.id} value={t.name}>{t.name}</option>
+                        ))}
+                      </select>
+                      {homeTeam && footballTeams.find(t => t.name === homeTeam) && (
+                        <img src={footballTeams.find(t => t.name === homeTeam)?.crestUrl} className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" alt="" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase">Away Team</label>
+                    <div className="relative">
+                      <select value={awayTeam} onChange={e => setAwayTeam(e.target.value)} disabled={uploading} className="w-full bg-[#0F0F0F] border border-neutral-700 text-white text-sm rounded-lg pl-10 pr-3 py-2 appearance-none">
+                        <option value="">Select Team</option>
+                        {footballTeams.map(t => (
+                          <option key={t.id} value={t.name}>{t.name}</option>
+                        ))}
+                      </select>
+                      {awayTeam && footballTeams.find(t => t.name === awayTeam) && (
+                        <img src={footballTeams.find(t => t.name === awayTeam)?.crestUrl} className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" alt="" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase">Final Score</label>
+                    <div className="flex items-center gap-2">
+                      <Input value={homeScore} onChange={e => setHomeScore(e.target.value)} placeholder="0" className="bg-[#0F0F0F] border-neutral-700 text-white text-center" disabled={uploading} />
+                      <span className="text-neutral-500">-</span>
+                      <Input value={awayScore} onChange={e => setAwayScore(e.target.value)} placeholder="0" className="bg-[#0F0F0F] border-neutral-700 text-white text-center" disabled={uploading} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase">Tournament Name</label>
+                    <Input value={tournamentName} onChange={e => setTournamentName(e.target.value)} placeholder="Champions League" className="bg-[#0F0F0F] border-neutral-700 text-white" disabled={uploading} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase">Match Date</label>
+                    <Input value={matchDate} onChange={e => setMatchDate(e.target.value)} placeholder="MM/DD/YYYY" className="bg-[#0F0F0F] border-neutral-700 text-white" disabled={uploading} />
+                  </div>
+                </div>
+
+                <div className="border-t border-neutral-800 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase">Timeline Events</label>
+                    <button type="button" onClick={addTimelineEvent} disabled={uploading} className="border border-indigo-500/50 text-indigo-400 text-xs px-2 py-1 rounded hover:bg-indigo-500/10 transition-colors">
+                      Add Event
                     </button>
+                  </div>
+                  
+                  {timelineEvents.length === 0 ? (
+                    <p className="text-xs text-neutral-600 italic">No events added.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      <div className="grid grid-cols-[80px_1fr_120px_auto] gap-2 items-center text-[10px] text-neutral-500 uppercase px-1">
+                        <span>Timestamp</span>
+                        <span>Event Type</span>
+                        <span>Player Name</span>
+                        <span></span>
+                      </div>
+                      {timelineEvents.map((evt, i) => (
+                        <div key={i} className="grid grid-cols-[80px_1fr_120px_auto] gap-2 items-center">
+                          <Input value={evt.timestamp} onChange={(e) => updateTimelineEvent(i, 'timestamp', e.target.value)} placeholder="24:00" disabled={uploading} className="bg-[#0F0F0F] border-neutral-700 text-white text-xs h-8" />
+                          <select value={evt.label} onChange={(e) => updateTimelineEvent(i, 'label', e.target.value)} disabled={uploading} className="bg-[#0F0F0F] border border-neutral-700 text-white text-xs h-8 rounded-md px-2">
+                            <option value="">Select...</option>
+                            <option value="Goal">Goal</option>
+                            <option value="Yellow Card">Yellow Card</option>
+                            <option value="Red Card">Red Card</option>
+                            <option value="Substitution">Substitution</option>
+                          </select>
+                          <Input value={evt.playerName || ''} onChange={(e) => updateTimelineEvent(i, 'playerName', e.target.value)} placeholder="Player Name" disabled={uploading} className="bg-[#0F0F0F] border-neutral-700 text-white text-xs h-8" />
+                          <button type="button" onClick={() => removeTimelineEvent(i)} disabled={uploading} className="p-1.5 text-neutral-500 hover:text-red-400 rounded hover:bg-red-400/10">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Timeline Events */}
-            <div className="border-t border-neutral-800 pt-2">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Match Timeline</p>
-                <button
-                  type="button"
-                  onClick={addTimelineEvent}
-                  disabled={uploading}
-                  className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-40"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Event
-                </button>
-              </div>
-
-              {timelineEvents.length === 0 ? (
-                <p className="text-xs text-neutral-600 italic">No events added. Events appear in the video stats timeline.</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {timelineEvents.map((evt, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_80px_80px_auto] gap-2 items-center">
-                      <Input
-                        value={evt.label}
-                        onChange={(e) => updateTimelineEvent(i, 'label', e.target.value)}
-                        placeholder="Label (e.g. Goal)"
-                        disabled={uploading}
-                        className="bg-[#0F0F0F] border-neutral-700 text-white text-xs focus-visible:ring-indigo-500 h-8"
-                      />
-                      <Input
-                        value={evt.timestamp}
-                        onChange={(e) => updateTimelineEvent(i, 'timestamp', e.target.value)}
-                        placeholder="45:00"
-                        disabled={uploading}
-                        className="bg-[#0F0F0F] border-neutral-700 text-white text-xs focus-visible:ring-indigo-500 h-8"
-                      />
-                      <Input
-                        type="number"
-                        value={evt.videoTimeSecs}
-                        onChange={(e) => updateTimelineEvent(i, 'videoTimeSecs', Number(e.target.value))}
-                        placeholder="secs"
-                        disabled={uploading}
-                        className="bg-[#0F0F0F] border-neutral-700 text-white text-xs focus-visible:ring-indigo-500 h-8"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeTimelineEvent(i)}
-                        disabled={uploading}
-                        className="text-neutral-600 hover:text-red-400 transition-colors disabled:opacity-40"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  <p className="text-[10px] text-neutral-600 mt-1">Columns: Label · Display timestamp · Seconds from video start</p>
-                </div>
-              )}
-            </div>
-
-            {/* Upload Progress */}
             {uploading && (
-              <div className="p-4 bg-neutral-900 rounded-lg border border-neutral-800">
-                <div className="flex justify-between text-xs text-neutral-400 mb-2">
+              <div className="mt-6 flex flex-col gap-2 bg-[#0a0a0a] rounded-lg p-3 border border-neutral-800">
+                <div className="flex justify-between items-center text-xs text-neutral-400 uppercase tracking-wider font-semibold">
                   <span>Uploading to Corestore...</span>
                   <span className="font-mono">{uploadProgress}%</span>
                 </div>
@@ -560,18 +583,22 @@ export function Studio() {
             )}
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setShowUploadModal(false)} disabled={uploading}
-              className="hover:bg-neutral-800 hover:text-white text-neutral-300">
-              Cancel
-            </Button>
-            <Button onClick={handleSelectAndUpload} disabled={uploading}
-              className="bg-white text-black hover:bg-neutral-200 disabled:opacity-50">
-              {uploading ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>
-              ) : 'Select File & Upload'}
-            </Button>
-          </DialogFooter>
+          <div className="px-6 py-4 border-t border-neutral-800 flex justify-end gap-3 bg-[#121212]">
+            {uploadStep === 1 ? (
+              <Button type="button" onClick={() => setUploadStep(2)} className="bg-indigo-600 hover:bg-indigo-500 text-white border-none w-full">
+                Next: Match Stats
+              </Button>
+            ) : (
+              <>
+                <Button type="button" variant="ghost" onClick={() => setShowUploadModal(false)} disabled={uploading} className="hover:bg-neutral-800 hover:text-white text-neutral-300">
+                  Cancel
+                </Button>
+                <Button onClick={handleSelectAndUpload} disabled={uploading} className="bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 min-w-[140px]">
+                  {uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</> : 'Seed Video'}
+                </Button>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -74,8 +74,12 @@ declare global {
         title?: string
         thumbnailPath?: string
         videoType?: string
-        opponentId?: string
-        score?: string
+        homeTeam?: string
+        awayTeam?: string
+        homeScore?: string
+        awayScore?: string
+        tournamentName?: string
+        matchDate?: string
         transcriptPath?: string
         eventsJson?: string
       }) => Promise<{ canceled: boolean; filePath?: string }>

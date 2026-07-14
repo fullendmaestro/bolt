@@ -582,8 +582,12 @@ rpc.onUploadVideo(async (req) => {
     isLive: false,
     // User-supplied match metadata
     videoType: req.videoType || '',
-    opponentId: req.opponentId || '',
-    score: req.score || '',
+    homeTeam: req.homeTeam || '',
+    awayTeam: req.awayTeam || '',
+    homeScore: req.homeScore || '',
+    awayScore: req.awayScore || '',
+    tournamentName: req.tournamentName || '',
+    matchDate: req.matchDate || '',
     transcriptPath: req.transcriptPath || '',
     eventsJson: req.eventsJson || ''
   }

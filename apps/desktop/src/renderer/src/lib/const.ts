@@ -1,4 +1,4 @@
-const footballTeams = [
+export const footballTeams = [
     {
         id: "paris-saint-germain",
         name: "Paris Saint-Germain",
