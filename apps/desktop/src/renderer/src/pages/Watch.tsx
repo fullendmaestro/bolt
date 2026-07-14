@@ -25,9 +25,11 @@ export function Watch({
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const [joined, setJoined] = useState(false)
   const [downloadState, setDownloadState] = useState<DownloadState>('idle')
-  const [downloadProgress, setDownloadProgress] = useState(0)
-  const [downloadBytesReceived, setDownloadBytesReceived] = useState(0)
-  const [downloadTotalBytes, setDownloadTotalBytes] = useState(0)
+  const [downloadProgress, setDownloadProgress] = useState<number>(0)
+  const [downloadBytesReceived, setDownloadBytesReceived] = useState<number>(0)
+  const [downloadTotalBytes, setDownloadTotalBytes] = useState<number>(0)
+  
+  const [isDescExpanded, setIsDescExpanded] = useState(false)
   const [swarmCount, setSwarmCount] = useState<number>(0)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -179,30 +181,9 @@ export function Watch({
 
         {/* Metadata */}
         <div className="flex flex-col gap-3">
-          <h1 className="text-xl font-bold text-[#F1F1F1] line-clamp-2 leading-tight">
+          <h1 className="text-xl font-bold text-[#F1F1F1] leading-tight break-words">
             {displayTitle}
           </h1>
-          
-          {/* Game Stats */}
-          {stream && (stream.videoType || stream.opponentId || stream.score) && (
-            <div className="flex flex-wrap items-center gap-3">
-              {stream.videoType && (
-                <div className="bg-white/10 rounded-full px-3 py-1 text-xs font-medium text-[#F1F1F1]">
-                  Match: {stream.videoType}
-                </div>
-              )}
-              {stream.opponentId && (
-                <div className="bg-white/10 rounded-full px-3 py-1 text-xs font-medium text-[#F1F1F1]">
-                  Vs: {stream.opponentId}
-                </div>
-              )}
-              {stream.score && (
-                <div className="bg-white/10 rounded-full px-3 py-1 text-xs font-medium text-[#F1F1F1]">
-                  Score: {stream.score}
-                </div>
-              )}
-            </div>
-          )}
           
           <div className="flex flex-wrap items-center justify-between gap-4 mt-1">
             <div className="flex items-center gap-3">
@@ -296,17 +277,46 @@ export function Watch({
         </div>
 
         {/* Description */}
-        <div className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl p-3 text-sm text-[#F1F1F1] mt-2 cursor-pointer">
+        <div 
+          onClick={() => setIsDescExpanded(!isDescExpanded)}
+          className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl p-3 text-sm text-[#F1F1F1] mt-2 cursor-pointer relative"
+        >
           <div className="font-medium mb-1">
             {streamUrl
               ? 'Streaming • Bolt Network Protocol (P2P)'
               : 'Connecting... • Bolt Network Protocol'}
           </div>
-          <p className="line-clamp-2 text-[#AAAAAA]">
+          
+          {stream && (stream.homeTeam || stream.awayTeam || stream.tournamentName) && (
+            <div className={`flex flex-wrap gap-2 mb-2 ${!isDescExpanded ? 'hidden' : ''}`}>
+              {stream.videoType && <span className="text-indigo-400 font-medium">#{stream.videoType.replace(/\s+/g, '')}</span>}
+              {stream.tournamentName && <span className="text-indigo-400 font-medium">#{stream.tournamentName.replace(/\s+/g, '')}</span>}
+              {stream.homeTeam && <span className="text-indigo-400 font-medium">#{stream.homeTeam.replace(/\s+/g, '')}</span>}
+              {stream.awayTeam && <span className="text-indigo-400 font-medium">#{stream.awayTeam.replace(/\s+/g, '')}</span>}
+            </div>
+          )}
+          
+          <div className={`${!isDescExpanded ? 'line-clamp-2' : ''} text-[#AAAAAA] whitespace-pre-wrap`}>
+            {stream && (stream.homeScore || stream.awayScore) && isDescExpanded && (
+              <p className="mb-2 text-white font-medium">
+                Final Score: {stream.homeTeam || 'Home'} {stream.homeScore} - {stream.awayScore} {stream.awayTeam || 'Away'}
+              </p>
+            )}
             This stream is hosted purely peer-to-peer via Bare runtime and Corestore. By watching,
             you are actively assisting in the distribution of the broadcast data to other network
             participants.
-          </p>
+          </div>
+          
+          {!isDescExpanded && (
+            <button className="font-bold text-white mt-1 hover:underline">
+              ...more
+            </button>
+          )}
+          {isDescExpanded && (
+            <button className="font-bold text-white mt-4 hover:underline block">
+              Show less
+            </button>
+          )}
         </div>
       </div>
 
