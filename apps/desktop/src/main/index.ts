@@ -143,12 +143,22 @@ function setupHandlers(): void {
     return 'model loaded'
   })
 
-  ipcMain.handle('infer', async (_event, history, options = {}) => {
+  ipcMain.handle('completion', async (_event, options: any = {}) => {
     if (!modelId) throw new Error('Model not loaded.')
 
-    const result = completion({ modelId, history, stream: true, ...options })
-    for await (const token of result.tokenStream) {
-      win?.webContents.send('completion-stream', token)
+    const result = await completion({ modelId, stream: true, ...options })
+    for await (const event of result.events || []) {
+      if (event.type === 'contentDelta') {
+        win?.webContents.send('completion-stream', event.text)
+      } else if (event.type === 'toolCall') {
+        win?.webContents.send('completion-tool-call', event.call)
+      }
+    }
+    // Backward compatibility for tokenStream in case qvacAPI hasn't updated its output structure
+    if (result.tokenStream) {
+      for await (const token of result.tokenStream) {
+        win?.webContents.send('completion-stream', token)
+      }
     }
     win?.webContents.send('completion-stream', '')
   })
