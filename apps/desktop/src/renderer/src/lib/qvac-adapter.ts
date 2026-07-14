@@ -58,6 +58,8 @@ export function createQvacModelAdapter(
                     resolve = null
                 })
 
+                // We still listen to tool calls just in case we want to show a loading state in the future,
+                // but the backend worker executes it natively now via BoltAgent.
                 const unsubscribeToolCall = window.qvacAPI.onCompletionToolCall((toolCall) => {
                     events.push({ type: "toolCall", toolCall })
                     resolve?.()
@@ -66,6 +68,7 @@ export function createQvacModelAdapter(
 
                 window.qvacAPI.startCompletion({
                     history: completionHistory,
+                    workspaceId: currentVideoWorkspaceId,
                     stream: true
                 }).catch(err => {
                     console.error("Completion error:", err)
@@ -93,57 +96,14 @@ export function createQvacModelAdapter(
             for await (const event of run) {
                 if (abortSignal?.aborted) break
 
-                if (event.type === "toolCall") {
-                    // ── Tool interception: RAG search ──────────────────
-                    try {
-                        if (!event.toolCall) throw new Error("toolCall payload missing")
-                        const args = event.toolCall.arguments || {}
-                        const query: string = args.query || ""
-
-                        const ragResults = await window.qvacAPI.ragQuery(
-                            currentVideoWorkspaceId!,
-                            query
-                        )
-
-                        const ragContext =
-                            ragResults && ragResults.length > 0
-                                ? ragResults.map((r: any) => r.content).join("\n\n")
-                                : "No relevant transcript sections found."
-
-                        // Feed the RAG result back as a tool response and re-run
-                        const continueHistory = [
-                            ...history,
-                            {
-                                role: "assistant",
-                                content: accumulatedText
-                            },
-                            {
-                                role: "tool",
-                                name: "search_video_transcript",
-                                content: ragContext
-                            }
-                        ]
-
-                        const followUp = runCompletion(continueHistory)
-
-                        for await (const followEvent of followUp) {
-                            if (abortSignal?.aborted) break
-                            if (followEvent.type === "contentDelta") {
-                                accumulatedText += followEvent.text
-                                yield { content: [{ type: "text", text: accumulatedText }] }
-                            }
-                        }
-                    } catch (err) {
-                        console.error("[QVAC] Tool call / RAG query failed:", err)
-                    }
-
-                } else if (event.type === "contentDelta") {
+                if (event.type === "contentDelta") {
                     accumulatedText += event.text
                     yield { content: [{ type: "text", text: accumulatedText }] }
+                } else if (event.type === "toolCall") {
+                    // Optional: You could yield a tool-call indicator here to the UI if desired
+                    // yield { content: [{ type: "text", text: accumulatedText + "\n*Searching transcript...*" }] }
                 }
             }
-
-
         }
     }
 }

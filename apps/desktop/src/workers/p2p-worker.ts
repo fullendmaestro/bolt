@@ -23,6 +23,8 @@ const BlobServer = require('hypercore-blob-server')
 const Autobase = require('autobase')
 const BlindPeering = require('blind-peering')
 
+import { BoltAgent } from '../agent'
+
 const {
   loadModel,
   unloadModel,
@@ -691,31 +693,36 @@ rpc.onUnloadModel(async (req) => {
   }
 })
 
-const TOOLS = [
-  {
-    name: 'search_video_transcript',
-    description: 'Search the current video\'s transcript for specific keywords, events, or timestamps. Use this whenever the user asks about something that happened in the video.',
-    parameters: z.object({
-      query: z.string().describe('The keywords or phrase to search for in the transcript')
-    })
-  }
-];
-
-rpc.onInfer(async (req) => {
+rpc.onInfer(async (req: any) => {
   try {
     const options = JSON.parse(req.optionsJson)
-    options.tools = TOOLS;
-    const run = completion({ modelId: req.modelId, ...options })
-    for await (const ev of run.events) {
-      if (ev.type === 'contentDelta') {
-        rpc.completionStream({ token: ev.text })
-      } else if (ev.type === 'toolCall') {
-        rpc.completionToolCall({ call: JSON.stringify(ev.call) })
+
+    // The frontend sends the full history, but the last message is what we process.
+    // The agent processes the entire history.
+    const history = options.history || []
+    const workspaceId = options.workspaceId || ''
+
+    const agent = new BoltAgent({
+      workspaceId,
+      embedModelId: embedModelId || ''
+    }, {
+      llmModelId: req.modelId,
+      callbacks: {
+        onStreamContent: (token) => {
+          rpc.completionStream({ token })
+        },
+        onToolCall: (toolName, args, status) => {
+          if (status === 'calling') {
+            rpc.completionToolCall({ call: JSON.stringify({ name: toolName, arguments: args }) })
+          }
+        }
       }
-    }
+    })
+
+    await agent.processMessage(history)
     rpc.completionStream({ token: '' }) // end of stream
     return { success: true }
-  } catch (err) {
+  } catch (err: any) {
     console.error('infer error:', err)
     throw err
   }

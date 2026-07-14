@@ -46,6 +46,7 @@ declare global {
       ragQuery: (workspaceId: string, query: string) => Promise<any[]>
       startCompletion: (options: {
         history: { role: string; content: string; name?: string }[]
+        workspaceId?: string
         stream: boolean
         tools?: object[]
       }) => Promise<void>
