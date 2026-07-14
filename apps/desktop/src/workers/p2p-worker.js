@@ -6,6 +6,7 @@ Bare.on('uncaughtException', (err) => { console.error('Uncaught Exception:', err
 Bare.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason) })
 
 
+const { z } = require('zod')
 const PearRuntime = require('pear-runtime')
 const Hyperswarm = require('hyperswarm')
 const Corestore = require('corestore')
@@ -690,9 +691,23 @@ rpc.onUnloadModel(async (req) => {
   }
 })
 
+const TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'search_video_transcript',
+      description: 'Search the current video\'s transcript for specific keywords, events, or timestamps. Use this whenever the user asks about something that happened in the video.',
+      parameters: z.object({
+        query: z.string().describe('The keywords or phrase to search for in the transcript')
+      })
+    }
+  }
+];
+
 rpc.onInfer(async (req) => {
   try {
     const options = JSON.parse(req.optionsJson)
+    options.tools = TOOLS;
     const run = completion({ modelId: req.modelId, ...options })
     for await (const ev of run.events) {
       if (ev.type === 'contentDelta') {

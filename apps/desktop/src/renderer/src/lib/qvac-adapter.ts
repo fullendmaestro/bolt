@@ -39,36 +39,12 @@ export function createQvacModelAdapter(
 
             history.unshift({ role: "system", content: systemPrompt })
 
-            // 3. Define the transcript search tool (only injected when a video is active)
-            const tools = currentVideoWorkspaceId
-                ? [
-                    {
-                        type: "function",
-                        function: {
-                            name: "search_video_transcript",
-                            description:
-                                "Search the current video's transcript for specific keywords, events, or timestamps. " +
-                                "Use this whenever the user asks about something that happened in the video.",
-                            parameters: {
-                                type: "object",
-                                properties: {
-                                    query: {
-                                        type: "string",
-                                        description: "The keywords or phrase to search for in the transcript"
-                                    }
-                                },
-                                required: ["query"]
-                            }
-                        }
-                    }
-                ]
-                : []
+            // 3. (Tools are now injected directly by the worker to avoid IPC Zod serialization issues)
 
             // 4. Run the completion (streaming)
             const run = await window.qvacAPI.completion({
                 history,
-                stream: true,
-                ...(tools.length > 0 ? { tools } : {})
+                stream: true
             })
 
             let accumulatedText = ""
