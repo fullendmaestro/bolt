@@ -693,14 +693,11 @@ rpc.onUnloadModel(async (req) => {
 
 const TOOLS = [
   {
-    type: 'function',
-    function: {
-      name: 'search_video_transcript',
-      description: 'Search the current video\'s transcript for specific keywords, events, or timestamps. Use this whenever the user asks about something that happened in the video.',
-      parameters: z.object({
-        query: z.string().describe('The keywords or phrase to search for in the transcript')
-      })
-    }
+    name: 'search_video_transcript',
+    description: 'Search the current video\'s transcript for specific keywords, events, or timestamps. Use this whenever the user asks about something that happened in the video.',
+    parameters: z.object({
+      query: z.string().describe('The keywords or phrase to search for in the transcript')
+    })
   }
 ];
 
