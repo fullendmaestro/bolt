@@ -63,6 +63,8 @@ export type ToolName = 'search_video_transcript'
 
 export interface ToolContext {
   workspaceId: string
+  videoTitle?: string
+  channelEvents?: any[]
   embedModelId: string
   updateState?: (patch: Partial<AgentState>) => void
   getState?: () => AgentState

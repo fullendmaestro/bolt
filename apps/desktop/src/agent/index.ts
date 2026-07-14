@@ -35,8 +35,32 @@ export class BoltAgent {
   public async processMessage(history: { role: string; content: string; name?: string }[]): Promise<TurnResult> {
     const startTurns = this.state.counters.turns_total
 
+    // Construct the System Prompt
+    let systemPrompt =
+      "You are a helpful sports AI assistant for the Bolt P2P streaming platform. " +
+      "You help users with sports analysis, commentary, and questions about what's happening in the stream."
+
+    if (this.toolContext.videoTitle) {
+      systemPrompt += `\n\nYou are currently watching the video: ${this.toolContext.videoTitle}`
+    }
+
+    if (this.toolContext.channelEvents && this.toolContext.channelEvents.length > 0) {
+      const eventContext = this.toolContext.channelEvents
+        .map((evt: any) => `[${evt.timestamp}] ${evt.eventType}: ${evt.description}`)
+        .join("\n")
+      systemPrompt +=
+        `\n\n--- LIVE CHANNEL EVENTS ---\n${eventContext}\n--- END EVENTS ---\n` +
+        `\nUse the above events to provide contextual, real-time answers about the stream.`
+    }
+
+    // Filter out any existing system messages from the frontend
+    const cleanedHistory = history.filter(m => m.role !== 'system')
+    
+    // Prepend the new system prompt
+    cleanedHistory.unshift({ role: 'system', content: systemPrompt })
+
     // Initialize messages from provided history
-    this.messages = history.map(m => ({
+    this.messages = cleanedHistory.map(m => ({
       role: m.role as any,
       content: m.content,
       name: m.name,

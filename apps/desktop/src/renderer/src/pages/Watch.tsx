@@ -314,11 +314,13 @@ export function Watch({
       <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
         <div className="sticky top-0 h-[calc(100vh-120px)] rounded-xl overflow-hidden border border-white/10 shadow-lg bg-[#0F0F0F] flex flex-col">
           <ChatInterface
+            key={videoId}
             modelStatus={modelStatus}
             modelProgress={modelProgress}
             loadModel={loadModel}
             channelKey={channelKey}
             currentVideoWorkspaceId={videoId ? `rag-${videoId}` : undefined}
+            currentVideoTitle={stream?.title}
           />
         </div>
       </div>

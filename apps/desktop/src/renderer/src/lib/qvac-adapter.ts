@@ -10,7 +10,8 @@ import type { ChannelEvent } from "../../../shared/types"
  */
 export function createQvacModelAdapter(
     channelEventsRef: React.RefObject<ChannelEvent[]>,
-    currentVideoWorkspaceId?: string
+    currentVideoWorkspaceId?: string,
+    currentVideoTitle?: string
 ): ChatModelAdapter {
     return {
         async *run({ messages, abortSignal }) {
@@ -22,26 +23,7 @@ export function createQvacModelAdapter(
                 return { role: msg.role, content: textContent }
             })
 
-            // 2. Build system prompt with channel event context
-            let systemPrompt =
-                "You are a helpful sports AI assistant for the Bolt P2P streaming platform. " +
-                "You help users with sports analysis, commentary, and questions about what's happening in the stream."
-
-            const events = channelEventsRef.current || []
-            if (events.length > 0) {
-                const eventContext = events
-                    .map((evt) => `[${evt.timestamp}] ${evt.eventType}: ${evt.description}`)
-                    .join("\n")
-                systemPrompt +=
-                    `\n\n--- LIVE CHANNEL EVENTS ---\n${eventContext}\n--- END EVENTS ---\n` +
-                    `\nUse the above events to provide contextual, real-time answers about the stream.`
-            }
-
-            history.unshift({ role: "system", content: systemPrompt })
-
-            // 3. (Tools are now injected directly by the worker to avoid IPC Zod serialization issues)
-
-            // 4. Run the completion (streaming)
+            // 2. Run the completion (streaming)
             // Helper to build a local generator for completions
             const runCompletion = async function* (completionHistory: any[]) {
                 const events: any[] = []
@@ -69,6 +51,8 @@ export function createQvacModelAdapter(
                 window.qvacAPI.startCompletion({
                     history: completionHistory,
                     workspaceId: currentVideoWorkspaceId,
+                    videoTitle: currentVideoTitle,
+                    channelEvents: channelEventsRef.current || [],
                     stream: true
                 }).catch(err => {
                     console.error("Completion error:", err)

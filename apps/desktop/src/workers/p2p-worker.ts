@@ -696,14 +696,15 @@ rpc.onUnloadModel(async (req) => {
 rpc.onInfer(async (req: any) => {
   try {
     const options = JSON.parse(req.optionsJson)
-
-    // The frontend sends the full history, but the last message is what we process.
-    // The agent processes the entire history.
-    const history = options.history || []
+      const history = options.history || []
     const workspaceId = options.workspaceId || ''
+    const videoTitle = options.videoTitle || ''
+    const channelEvents = options.channelEvents || []
 
     const agent = new BoltAgent({
       workspaceId,
+      videoTitle,
+      channelEvents,
       embedModelId: embedModelId || ''
     }, {
       llmModelId: req.modelId,

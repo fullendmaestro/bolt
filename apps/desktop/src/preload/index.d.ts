@@ -47,6 +47,8 @@ declare global {
       startCompletion: (options: {
         history: { role: string; content: string; name?: string }[]
         workspaceId?: string
+        videoTitle?: string
+        channelEvents?: any[]
         stream: boolean
         tools?: object[]
       }) => Promise<void>
