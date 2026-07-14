@@ -43,13 +43,16 @@ async function initAI() {
   try {
     const parakeetModule = await import('@qvac/bare-sdk/parakeet-transcription/plugin');
     const embeddingsModule = await import('@qvac/bare-sdk/llamacpp-embedding/plugin');
+    const llmModule = await import('@qvac/bare-sdk/llamacpp-completion/plugin');
 
     const parakeet = parakeetModule.parakeetPlugin || parakeetModule.default || parakeetModule;
     const embeddings = embeddingsModule.embeddingsPlugin || embeddingsModule.default || embeddingsModule;
+    const llm = llmModule.llmPlugin || llmModule.default || llmModule;
 
     plugins([
       parakeet,
-      embeddings
+      embeddings,
+      llm
     ]);
 
     console.log("P2P Worker plugins registered successfully!");
